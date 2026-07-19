@@ -1,6 +1,6 @@
 # Server-Driven Decisions with DroidShield
 
-← Back to [README.md](README.md)
+← Back to [README.md](../README.md)
 
 This guide explains how to take DroidShield's on-device results and let **your server** decide what happens next — instead of hardcoding "if rooted, block" into your app.
 
@@ -240,4 +240,4 @@ Ship it as a killable feature flag. You want to be able to turn enforcement off 
 
 ---
 
-See also: [README.md](README.md) for setup and the check catalogue, [ARCHITECTURE.md](ARCHITECTURE.md) for the SDK's internal design, [DECISIONS.md](DECISIONS.md) for the rationale log.
+See also: [README.md](../README.md) for setup and the check catalogue, [ARCHITECTURE.md](ARCHITECTURE.md) for the SDK's internal design, [DECISIONS.md](DECISIONS.md) for the rationale log.

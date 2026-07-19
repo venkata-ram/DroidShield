@@ -80,7 +80,7 @@ fun submitPayment() {
 Injected triggers are rate-limited and never run checks on the caller thread. Release
 builds also fail when they are debuggable or omit R8 minification/resource shrinking.
 
-See **[INTEGRATION.md](INTEGRATION.md)** for what the plugin does and the other integration scenarios.
+See **[INTEGRATION.md](docs/INTEGRATION.md)** for what the plugin does and the other integration scenarios.
 
 ## What's different about it
 
@@ -104,11 +104,12 @@ cd sample-app && ../gradlew assembleDebug
 
 ## Documentation
 
-- [CONTRIBUTING.md](CONTRIBUTING.md) — development setup, check design rules, tests, and pull-request expectations
-- [INTEGRATION.md](INTEGRATION.md) — setup, configuration, and nine usage scenarios
-- [SERVER_DRIVEN_DECISIONS.md](SERVER_DRIVEN_DECISIONS.md) — letting your backend, not the APK, decide how to respond to threats
-- [ARCHITECTURE.md](ARCHITECTURE.md) — module layering and the extensibility contract
-- [DECISIONS.md](DECISIONS.md) — append-only rationale log
+- [CONTRIBUTING.md](docs/CONTRIBUTING.md) — development setup, check design rules, tests, and pull-request expectations
+- [INTEGRATION.md](docs/INTEGRATION.md) — setup, configuration, and nine usage scenarios
+- [SERVER_DRIVEN_DECISIONS.md](docs/SERVER_DRIVEN_DECISIONS.md) — letting your backend, not the APK, decide how to respond to threats
+- [ARCHITECTURE.md](docs/ARCHITECTURE.md) — module layering and the extensibility contract
+- [DECISIONS.md](docs/DECISIONS.md) — append-only rationale log
+- [SOURCES.md](docs/SOURCES.md) — citations for the 40 implemented threat checks
 
 ## An honest caveat
 

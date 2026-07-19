@@ -3,7 +3,7 @@
 Full setup and usage details. DroidShield supplies runtime threat signals and backend
 evidence; the host app and its backend own policy and enforcement. It is a foundation
 for a broader RASP architecture, not a complete RASP product. For a short overview,
-see [README.md](README.md).
+see [README.md](../README.md).
 
 ## Contents
 
