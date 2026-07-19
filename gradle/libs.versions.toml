@@ -4,6 +4,7 @@ kotlin = "2.0.21"
 agp = "8.7.2"
 dagger = "2.52"
 androidx-core = "1.13.1"
+coroutines = "1.8.1"
 junit = "4.13.2"
 truth = "1.4.4"
 
@@ -11,6 +12,7 @@ truth = "1.4.4"
 dagger = { module = "com.google.dagger:dagger", version.ref = "dagger" }
 dagger-compiler = { module = "com.google.dagger:dagger-compiler", version.ref = "dagger" }
 androidx-core = { module = "androidx.core:core-ktx", version.ref = "androidx-core" }
+coroutines-core = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-core", version.ref = "coroutines" }
 junit = { module = "junit:junit", version.ref = "junit" }
 truth = { module = "com.google.truth:truth", version.ref = "truth" }
 

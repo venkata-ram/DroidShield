@@ -5,6 +5,8 @@ import dev.droidshield.data.AndroidCheckContext
 import dev.droidshield.domain.CheckResult
 import dev.droidshield.domain.ThreatReporter
 import dev.droidshield.domain.TelemetrySink
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 /**
  * The only class most integrators ever import (ARCHITECTURE.md §3). Not a
@@ -17,10 +19,32 @@ class DroidShield private constructor(
     private val component: DroidShieldComponent,
     private val androidContext: Context,
 ) {
-    /** Runs every registered check once and returns all results (not just detected ones). */
+    /**
+     * Runs every registered check once and returns all results (not just
+     * detected ones) on the calling thread. Individual checks do blocking
+     * disk I/O (`/proc` reads, file existence checks, ZIP parsing) and one
+     * does a socket connect attempt (DECISIONS.md D016) — calling this
+     * directly from a lifecycle callback (e.g. `Application.onCreate`)
+     * blocks the main thread. Use this only when the caller already
+     * manages its own background thread (e.g. inside a `WorkManager`
+     * `Worker.doWork()`). From a coroutine, prefer [runChecksSuspending].
+     */
     fun runChecks(): List<CheckResult> {
         val engine = component.engine()
         return engine.runAll(AndroidCheckContext(androidContext))
+    }
+
+    /**
+     * Coroutine-friendly entry point: runs [runChecks] on [Dispatchers.IO]
+     * so it's safe to call from `Application.onCreate` (or any other
+     * lifecycle callback) inside a `launch { }` without blocking the
+     * calling thread. This is the recommended way to invoke DroidShield —
+     * see DECISIONS.md D016/D030 for why the underlying checks stay
+     * synchronous (not `suspend`) while the dispatch decision lives here,
+     * at the facade, instead.
+     */
+    suspend fun runChecksSuspending(): List<CheckResult> = withContext(Dispatchers.IO) {
+        runChecks()
     }
 
     companion object {

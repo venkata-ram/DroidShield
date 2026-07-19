@@ -35,6 +35,12 @@ dependencies {
     implementation(project(":droidshield-engine"))
     implementation(libs.dagger)
     kapt(libs.dagger.compiler)
+    // api, not implementation: DroidShield.runChecksSuspending() is part
+    // of the public surface (DECISIONS.md D030), so consumers calling it
+    // from their own coroutine (launch { }, lifecycleScope, etc.) need
+    // kotlinx-coroutines on their compile classpath too — api propagates
+    // it transitively instead of every integrator having to redeclare it.
+    api(libs.coroutines.core)
 
     testImplementation(libs.junit)
     testImplementation(libs.truth)

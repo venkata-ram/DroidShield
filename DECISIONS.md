@@ -858,3 +858,52 @@ indistinguishable from a genuinely broken one in telemetry, losing the
 more specific "not configured" signal.
 
 ---
+
+---
+
+## D030 — Coroutine entry point added; `Application.onCreate()` must not call the blocking `runChecks()` directly
+
+**Date:** 2026-07-19
+**Status:** Decided
+
+**Decision:** `DroidShield` gains `suspend fun runChecksSuspending(): List<CheckResult>`,
+which runs the existing blocking `runChecks()` inside `withContext(Dispatchers.IO)`.
+`droidshield-sdk` now depends on `kotlinx-coroutines-core` as an `api`
+dependency. `sample-app`'s `SampleApplication` was fixed to call
+`runChecksSuspending()` from a `CoroutineScope(SupervisorJob()).launch { }`
+instead of calling the blocking `runChecks()` straight from `onCreate()`.
+
+**Reasoning:** This was a real bug, not a style preference — caught by
+the user, and it directly contradicted DECISIONS.md D016, which already
+documented that individual checks do blocking I/O (`/proc` reads, ZIP
+parsing, a socket connect attempt in `FridaPortCheck`) and must not run
+on a thread invoked from a lifecycle callback. The original
+`SampleApplication` called `droidShield.runChecks()` synchronously
+inside `onCreate()` — exactly the case D016 warned about — which would
+stall app startup on the main thread. D016 also considered and
+deferred making `ThreatCheck.evaluate()` itself a `suspend fun`,
+reasoning that forcing every check author to deal with coroutines
+raises the contribution bar for what should be simple, synchronous
+Kotlin. That reasoning still holds: the fix here keeps every
+`ThreatCheck` implementation and `ThreatDetectionEngine.runAll()`
+completely synchronous, and pushes the threading decision to the one
+place that actually needs to make it — the public facade. `runChecks()`
+(blocking) is kept alongside `runChecksSuspending()` rather than removed,
+since a caller that already manages its own background thread (e.g. a
+`WorkManager` `Worker.doWork()`, which runs off the main thread by
+contract) shouldn't be forced to spin up a coroutine just to call a
+method it can already call safely.
+
+**Alternatives considered:**
+- Make `ThreatCheck.evaluate()` itself `suspend`. Rejected again, for
+  the same reason as D016: it would ripple through every one of the ~37
+  check implementations for a problem that's actually about *where the
+  whole batch runs*, not about any individual check's own contract.
+- Remove the blocking `runChecks()` entirely, forcing all callers
+  through the suspend variant. Rejected — would break the legitimate
+  "I'm already on a background thread" caller for no benefit.
+
+**Verified:** `./gradlew build` succeeds for all 7 modules with the new
+dependency and API surface; `sample-app:compileDebugKotlin` and
+`droidshield-sdk:compileDebugKotlin` both compile cleanly against the
+coroutine-based call site.
