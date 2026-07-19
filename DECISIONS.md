@@ -907,3 +907,36 @@ method it can already call safely.
 dependency and API surface; `sample-app:compileDebugKotlin` and
 `droidshield-sdk:compileDebugKotlin` both compile cleanly against the
 coroutine-based call site.
+
+---
+
+## D031 — sample-app needs a launcher Activity; DroidShield itself stays headless
+
+**Date:** 2026-07-19
+**Status:** Decided
+
+**Decision:** Added `MainActivity` (a trivial `Activity` showing a static
+`TextView`) with a `MAIN`/`LAUNCHER` intent filter to `sample-app`. No
+change to `droidshield-sdk` or any other module.
+
+**Reasoning:** `sample-app` had an `Application` class but zero
+`Activity`s — verified directly by installing and launching it on a
+connected emulator, which failed with "default activity not found"
+since there was nothing for the launcher to resolve. This is specific
+to the *demo app*, not the SDK: `droidshield-sdk` correctly has no
+`Activity`/`Fragment` dependency (D015, headless library), and that
+constraint is unaffected — `MainActivity` lives in `sample-app` only,
+exists purely so the demo app is launchable, and does nothing but
+display a static pointer to the logcat tag where `SampleApplication`
+already logs check results.
+
+**Verified on-device (2026-07-19, Pixel 7a AVD):** Installed and
+launched via `adb shell am start`. All 40 registered checks
+(36 Kotlin + 4 native) ran with zero crashes via the
+`runChecksSuspending()` coroutine path added in D030. Native checks
+executed correctly on-device (`debugger.ptrace_self_attach` and others
+returned real results, not just compiled), and the emulator-detection
+checks correctly fired true (`emulator.build_fingerprint`,
+`emulator.build_product_board`, `emulator.network_interface`) since
+this genuinely is an AVD — the first true runtime confirmation of the
+check logic, not just a build-time compile check.
