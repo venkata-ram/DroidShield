@@ -18,4 +18,10 @@ object NativeBridge {
 
     /** CHECKS_SEED_LIST.md DEBUGGER #8. */
     external fun sigtrapHandlerAnomalyDetected(): Boolean
+
+    /** CHECKS_SEED_LIST.md HOOK #5. */
+    external fun nativeCodeChecksumMismatch(): Boolean
+
+    /** CHECKS_SEED_LIST.md HOOK #6. arm64 only — see jni_bridge.cpp. */
+    external fun trampolineHookDetected(): Boolean
 }
