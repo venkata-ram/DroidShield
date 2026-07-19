@@ -562,3 +562,83 @@ debug and release APKs).
 
 ---
 
+## D022 — `droidshield-engine` is a pure Kotlin JVM module, not an Android library
+
+**Date:** 2026-07-19
+**Status:** Decided
+
+**Decision:** `droidshield-engine` uses the same `kotlin.jvm` plugin as
+`droidshield-domain`, not `com.android.library`.
+
+**Reasoning:** `ARCHITECTURE.md` §3 is explicit that the engine "does not
+know about specific checks — it operates on the `ThreatCheck` contract
+only," and §2's dependency rule has `data`/`build-plugin` depend on
+`domain`, not the reverse. Since the engine only needs `Set<ThreatCheck>`,
+ordering/shuffling logic, and the domain contract types — none of which
+touch Android APIs — there's no reason for it to carry an Android
+dependency. Keeping it a plain JVM module keeps it JVM-testable (same
+benefit as domain, see `droidshield-domain/OVERVIEW.md`) and physically
+prevents a future contributor from accidentally reaching for a
+`PackageManager` call inside engine code, which would violate the "engine
+never knows about specific checks" invariant.
+
+**Alternatives considered:** Android library module for consistency with
+the other runtime modules (`data-android`, `sdk`). Rejected — "consistent
+module type" isn't a real benefit; preventing an accidental Android
+dependency creeping into the one module that's supposed to stay
+check-agnostic is a real one.
+
+---
+
+## D023 — Stub modules for `data-android`, `native`, `gradle-plugin`, `sdk`, `sample-app` contain no detection/engine logic yet
+
+**Date:** 2026-07-19
+**Status:** Decided (scope note, not an architectural decision)
+
+**Decision:** This scaffolding pass creates buildable, minimal module
+shells (`build.gradle.kts`, manifests, an `OVERVIEW.md` per module) for
+the five remaining modules, but does not implement actual `ThreatCheck`s,
+the Dagger graph, the ASM instrumentation, or CMake native checks in them.
+
+**Reasoning:** Per the project's own working rules, half-finished feature
+implementations are worse than none — a fake `RootChecksModule` with no
+real checks, or a Dagger component that doesn't actually compile against
+real bindings, would be misleading scaffolding that looks more done than
+it is. Each real check (per `CHECKS_SEED_LIST.md`), the actual Dagger
+wiring (§6), and the ASM visitor logic (`droidshield-gradle-plugin`) are
+substantial enough to warrant their own focused pass rather than being
+rushed into this scaffolding step.
+
+**Follow-up:** Implement `droidshield-data-android` checks one category at
+a time (ROOT first, per `CHECKS_SEED_LIST.md` ordering), then wire the
+Dagger graph in `droidshield-sdk` once at least one category has real
+checks to bind.
+
+**Resolution (2026-07-19):** Superseded — all five categories, the Dagger
+graph, and the plugin are now implemented. See D025–D029.
+
+---
+
+## D024 — `droidshield-native`'s package/namespace is `dev.droidshield.nativelayer`, not `dev.droidshield.native`
+
+**Date:** 2026-07-19
+**Status:** Decided
+
+**Decision:** The module directory stays `droidshield-native` (matches
+ARCHITECTURE.md §3), but its Android `namespace` and Kotlin package are
+`dev.droidshield.nativelayer`.
+
+**Reasoning:** Verified directly in this environment — AGP rejected
+`namespace = "dev.droidshield.native"` at configuration time with
+"`native` is a Java keyword," since `native` is a reserved word in Java
+package/identifier grammar (used for JNI method modifiers) even though
+Kotlin itself doesn't reserve it. The module's Gradle name is unaffected
+since Gradle project names aren't Java identifiers.
+
+**Alternatives considered:** `dev.droidshield.nativecheck` — considered,
+but `nativelayer` more directly names what §2 of `ARCHITECTURE.md` calls
+this tier ("data layer... native bridge"), so it was picked as the closer
+match to existing architecture vocabulary.
+
+---
+

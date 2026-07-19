@@ -1,0 +1,41 @@
+// The public .aar. Only module most integrators ever import.
+plugins {
+    alias(libs.plugins.android.library)
+    alias(libs.plugins.kotlin.android)
+    // No version here: kapt ships bundled with the Kotlin Gradle plugin
+    // already on the classpath via kotlin-android above — declaring a
+    // version via the catalog caused a "plugin already on classpath with
+    // unknown version" conflict (verified in this environment).
+    id("org.jetbrains.kotlin.kapt")
+}
+
+android {
+    namespace = "dev.droidshield.sdk"
+    compileSdk = 35
+
+    defaultConfig {
+        minSdk = 24
+        consumerProguardFiles("consumer-rules.pro")
+    }
+
+    compileOptions {
+        sourceCompatibility = JavaVersion.VERSION_17
+        targetCompatibility = JavaVersion.VERSION_17
+    }
+}
+
+kotlin {
+    jvmToolchain(17)
+}
+
+dependencies {
+    api(project(":droidshield-domain"))
+    implementation(project(":droidshield-data-android"))
+    implementation(project(":droidshield-native"))
+    implementation(project(":droidshield-engine"))
+    implementation(libs.dagger)
+    kapt(libs.dagger.compiler)
+
+    testImplementation(libs.junit)
+    testImplementation(libs.truth)
+}
