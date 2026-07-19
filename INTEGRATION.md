@@ -60,11 +60,11 @@ plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
     // Generates the per-build polymorphic seed. Optional — see Scenario 4.
-    id("com.github.venkata-ram.DroidShield") version "0.2.0"
+    id("com.github.venkata-ram.DroidShield") version "0.3.0"
 }
 
 dependencies {
-    implementation("com.github.venkata-ram.DroidShield:droidshield-sdk:0.2.0")
+    implementation("com.github.venkata-ram.DroidShield:droidshield-sdk:0.3.0")
 }
 ```
 
@@ -85,7 +85,7 @@ JitPack rewrites to `com.github.…` only on publish — so the coordinate diffe
 JitPack one:
 
 ```kotlin
-implementation("dev.droidshield:droidshield-sdk:0.2.0")
+implementation("dev.droidshield:droidshield-sdk:0.3.0")
 ```
 
 The **plugin** is not subject to that: its group is pinned to
@@ -151,7 +151,54 @@ DroidShield deliberately never shows a dialog or kills your process. It's headle
 
 For the stronger version of this — sending results to your backend and letting the **server** decide what happens, so the policy isn't hardcoded into an APK the attacker controls — see **[SERVER_DRIVEN_DECISIONS.md](SERVER_DRIVEN_DECISIONS.md)**.
 
-### Scenario 3 — Detect a repackaged APK
+### Scenario 3 — Ask any Retrofit backend for a decision
+
+`collectEvidence()` runs the checks and returns a stable, transport-neutral
+`DeviceEvidence` object. It fills the app package/version, Android SDK, DroidShield
+version, check count, and triggered checks itself. The SDK deliberately does not bring
+Retrofit or a JSON converter into your app.
+
+Define the endpoint using the Retrofit converter your app already uses:
+
+```kotlin
+interface DeviceRiskApi {
+    @POST("device-risk/evaluate")
+    suspend fun evaluate(@Body evidence: DeviceEvidence): RiskDecision
+}
+```
+
+Collect and send the evidence before a sensitive operation:
+
+```kotlin
+val evidence = droidShield.collectEvidence(
+    EvidenceContext(
+        installationId = appInstallId, // opaque IDs owned by your app
+        sessionId = session.id,
+        nonce = riskApi.fetchNonce(),  // optional, recommended against replay
+    )
+)
+
+val decision = riskApi.evaluate(evidence)
+when (decision.verdict) {
+    RiskVerdict.ALLOW, RiskVerdict.MONITOR -> proceed()
+    RiskVerdict.STEP_UP -> requireReauthentication()
+    RiskVerdict.LIMIT -> enterReadOnlyMode()
+    RiskVerdict.BLOCK -> showGenericBlockedMessage(decision.referenceId)
+}
+```
+
+The JSON field names are the Kotlin property names (`schemaVersion`, `sdkVersion`,
+`triggeredChecks`, and so on). `schemaVersion` is currently `1`. Trigger entries contain
+only `checkId`, `category`, and `severity`; potentially sensitive `CheckResult.detail`
+text is excluded.
+
+Authentication still belongs in your normal Authorization header or Retrofit
+interceptor—not in `EvidenceContext`. Network failure policy also belongs to the host
+app: fail closed for a sensitive operation and fail open for harmless/read-only work.
+Most importantly, the backend must attach the verdict to the authenticated session and
+reject protected APIs itself. A client-side blocked screen is UX, not enforcement.
+
+### Scenario 4 — Detect a repackaged APK
 
 Tamper checks need values only you can know, supplied via `DroidShieldConfig`. Omit a field and its check simply goes quiet rather than false-positiving.
 
@@ -170,7 +217,7 @@ DroidShield.init(
 
 > `expectedManifestAllowBackup` defaults to `true` because that's the *platform* default when the attribute is absent. If your manifest sets `android:allowBackup="false"`, set this to `false` too — otherwise every clean run reports a tamper.
 
-### Scenario 4 — Turn on polymorphic builds
+### Scenario 5 — Turn on polymorphic builds
 
 Apply the `dev.droidshield` plugin, then feed the generated seed in:
 
@@ -187,7 +234,7 @@ The seed is derived from your project path and version, so it's stable across in
 
 Leave `polymorphicSeed` null and checks run in deterministic declaration order — which is what you want in tests.
 
-### Scenario 5 — Run checks periodically, not just at startup
+### Scenario 6 — Run checks periodically, not just at startup
 
 A one-shot check at launch is easy to sidestep: attach Frida after startup. Re-run on a background thread whenever it matters — app resume, before a payment, on session refresh.
 
@@ -200,7 +247,7 @@ class ThreatWorker(ctx: Context, params: WorkerParameters) : Worker(ctx, params)
 }
 ```
 
-### Scenario 6 — Send operational telemetry somewhere
+### Scenario 7 — Send operational telemetry somewhere
 
 `TelemetrySink` is separate from `ThreatReporter` on purpose. Threat signals are security data; telemetry is "is the SDK healthy" data (`engine_run_started`, `check_executed`, `check_error`). Conflating them would force anyone wanting basic usage analytics into the threat-reporting business.
 
@@ -215,7 +262,7 @@ DroidShield.init(context, telemetrySink = PostHogSink(posthog))
 
 Default payloads carry no PII and no raw stack traces. Anything richer is your explicit opt-in.
 
-### Scenario 7 — Add your own check
+### Scenario 8 — Add your own check
 
 ```kotlin
 // droidshield-data-android/.../checks/root/MyCheck.kt

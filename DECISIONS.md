@@ -1046,3 +1046,32 @@ and a copy of `sample-app` pointed at mavenLocal (standing in for JitPack)
 built successfully with no `resolutionStrategy`. `compileDebugKotlin`
 passing proves the plugin resolved by ID and generated `DroidShieldBuildSeed`.
 Not yet verified against JitPack itself — that needs tag 0.2.0 pushed.
+
+## D034 — Backend decisions use a transport-neutral contract, not a bundled HTTP client
+
+**Date:** 2026-07-19
+**Status:** Decided
+
+**Decision:** The public API now includes `DeviceEvidence`, `TriggeredCheck`,
+`EvidenceContext`, `RiskVerdict`, and `RiskDecision`, plus
+`DroidShield.collectEvidence()`. The facade collects app/device metadata and check
+results into the request model, but it does not send the request. Integrators define
+their own Retrofit (or other HTTP client) interface, converter, authentication, and
+failure policy. Wire DTO names and fields are preserved by consumer R8 rules.
+
+**Reasoning:** A shared request/response shape makes backend-driven policy easy to
+integrate and version without coupling the SDK to a backend vendor. Depending on
+Retrofit or a particular JSON converter would impose that networking stack on every
+host app and conflict with D001. Plain Kotlin data classes work with reflection-based
+Retrofit/Gson, Moshi, Jackson, Ktor integrations, and manual clients without making
+any of them SDK dependencies. A schema version gives servers an explicit evolution
+point.
+
+The contract excludes `CheckResult.detail` because it can contain local paths and
+process names. Installation, session, and nonce values remain app-supplied and opaque;
+the SDK does not generate or persist tracking identifiers. Server-side enforcement is
+still mandatory: a returned verdict that only changes Android UI is not a security
+boundary.
+
+**Verified (2026-07-19):** `:droidshield-domain:test`,
+`:droidshield-sdk:testDebugUnitTest`, and `:droidshield-sdk:assembleRelease` all pass.

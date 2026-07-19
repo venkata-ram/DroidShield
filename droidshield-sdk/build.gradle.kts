@@ -16,6 +16,11 @@ android {
     defaultConfig {
         minSdk = 24
         consumerProguardFiles("consumer-rules.pro")
+        buildConfigField("String", "DROIDSHIELD_VERSION", "\"${project.version}\"")
+    }
+
+    buildFeatures {
+        buildConfig = true
     }
 
     compileOptions {

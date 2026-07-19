@@ -1,10 +1,14 @@
 package dev.droidshield.sdk
 
 import android.content.Context
+import android.os.Build
 import dev.droidshield.data.AndroidCheckContext
 import dev.droidshield.domain.CheckResult
 import dev.droidshield.domain.ThreatReporter
 import dev.droidshield.domain.TelemetrySink
+import dev.droidshield.domain.backend.DeviceEvidence
+import dev.droidshield.domain.backend.EvidenceContext
+import dev.droidshield.domain.backend.toDeviceEvidence
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
@@ -45,6 +49,37 @@ class DroidShield private constructor(
      */
     suspend fun runChecksSuspending(): List<CheckResult> = withContext(Dispatchers.IO) {
         runChecks()
+    }
+
+    /**
+     * Runs all checks and returns a transport-neutral payload that can be used
+     * directly as a Retrofit request body. DroidShield performs no networking;
+     * the host app owns its endpoint, converter, authentication, and retry
+     * policy.
+     *
+     * App and Android version fields are read by the SDK. Opaque installation,
+     * session, and server-issued nonce values may be supplied through [context].
+     */
+    suspend fun collectEvidence(
+        context: EvidenceContext = EvidenceContext(),
+    ): DeviceEvidence = withContext(Dispatchers.IO) {
+        val packageInfo = @Suppress("DEPRECATION")
+        androidContext.packageManager.getPackageInfo(androidContext.packageName, 0)
+        val versionCode = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+            packageInfo.longVersionCode
+        } else {
+            @Suppress("DEPRECATION")
+            packageInfo.versionCode.toLong()
+        }
+
+        runChecks().toDeviceEvidence(
+            sdkVersion = BuildConfig.DROIDSHIELD_VERSION,
+            appPackageName = androidContext.packageName,
+            appVersionName = packageInfo.versionName,
+            appVersionCode = versionCode,
+            androidSdk = Build.VERSION.SDK_INT,
+            context = context,
+        )
     }
 
     companion object {
