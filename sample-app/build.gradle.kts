@@ -8,10 +8,10 @@ plugins {
     // The plugin ID is the JitPack coordinate, which is what lets this build
     // skip the resolutionStrategy workaround entirely (DECISIONS.md D033).
     // Literal version: the plugins block cannot reference a val.
-    id("com.github.venkata-ram.DroidShield") version "0.3.1"
+    id("com.github.venkata-ram.DroidShield") version "0.3.2"
 }
 
-val droidShieldVersion = "0.3.1"
+val droidShieldVersion = "0.3.2"
 
 // DroidShield derives its release-specific ordering seed from Gradle's
 // Project.version. Android's versionName is a separate value, so keep both

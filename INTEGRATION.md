@@ -63,11 +63,11 @@ plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
     // Generates the version-derived ordering seed. Optional — see Scenario 5.
-    id("com.github.venkata-ram.DroidShield") version "0.3.1"
+    id("com.github.venkata-ram.DroidShield") version "0.3.2"
 }
 
 dependencies {
-    implementation("com.github.venkata-ram.DroidShield:droidshield-sdk:0.3.1")
+    implementation("com.github.venkata-ram.DroidShield:droidshield-sdk:0.3.2")
 }
 ```
 
@@ -88,7 +88,7 @@ JitPack rewrites to `com.github.…` only on publish — so the coordinate diffe
 JitPack one:
 
 ```kotlin
-implementation("dev.droidshield:droidshield-sdk:0.3.1")
+implementation("dev.droidshield:droidshield-sdk:0.3.2")
 ```
 
 The **plugin** is not subject to that: its group is pinned to

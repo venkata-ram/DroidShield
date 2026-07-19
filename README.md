@@ -35,7 +35,7 @@ Then depend on the SDK — `droidshield-sdk` pulls in the domain, check, native 
 ```kotlin
 // app/build.gradle.kts
 dependencies {
-    implementation("com.github.venkata-ram.DroidShield:droidshield-sdk:0.3.1")
+    implementation("com.github.venkata-ram.DroidShield:droidshield-sdk:0.3.2")
 }
 ```
 
@@ -61,7 +61,7 @@ That's the whole runtime setup — no `resolutionStrategy`, no extra plumbing. R
 ```kotlin
 // app/build.gradle.kts
 plugins {
-    id("com.github.venkata-ram.DroidShield") version "0.3.1"
+    id("com.github.venkata-ram.DroidShield") version "0.3.2"
 }
 ```
 
