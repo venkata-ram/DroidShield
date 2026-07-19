@@ -34,17 +34,6 @@ class DroidShieldPlugin : Plugin<Project> {
             task.outputDir.set(target.layout.buildDirectory.dir("generated/droidshield/kotlin"))
         }
 
-        val androidComponents = target.extensions.findByType(AndroidComponentsExtension::class.java)
-        if (androidComponents == null) {
-            target.logger.warn(
-                "DroidShield Gradle plugin applied to '${target.path}', but no Android Gradle Plugin " +
-                    "(application or library) was found — generateDroidShieldSeed will run but its output " +
-                    "won't be wired into any compilation. Apply com.android.application or " +
-                    "com.android.library before dev.droidshield.",
-            )
-            return
-        }
-
         // withId defers until the Kotlin Android plugin is applied, whichever
         // order the consumer's plugins {} block lists them in — unlike a
         // one-shot hasPlugin() check, this doesn't depend on dev.droidshield
@@ -53,9 +42,42 @@ class DroidShieldPlugin : Plugin<Project> {
             val kotlinExtension = target.extensions.getByType(KotlinAndroidProjectExtension::class.java)
             kotlinExtension.sourceSets.getByName("main").kotlin.srcDir(generateSeedTask.map { it.outputDir })
         }
+
+        // The no-Android-plugin warning has to be deferred too. Reading the
+        // extension eagerly here made the check order-dependent in exactly
+        // the way the comment above says it must not be: applying
+        // dev.droidshield before com.android.application warned and
+        // early-returned on a perfectly valid build. afterEvaluate runs once
+        // the consumer's whole plugins {} block has been processed.
+        target.afterEvaluate {
+            if (it.extensions.findByType(AndroidComponentsExtension::class.java) == null) {
+                it.logger.warn(
+                    "DroidShield Gradle plugin applied to '${it.path}', but no Android Gradle Plugin " +
+                        "(application or library) was found — generateDroidShieldSeed will run but its output " +
+                        "won't be wired into any compilation. Apply com.android.application or " +
+                        "com.android.library alongside dev.droidshield.",
+                )
+            }
+        }
     }
 
+    /**
+     * `Random(System.nanoTime())` produced a different seed on every
+     * *configuration*, not every release. Because [GenerateDroidShieldSeedTask]
+     * declares the seed as an `@Input`, the task was never up to date, so
+     * it rewrote its source file and forced a full Kotlin recompile on
+     * every single build — including no-op ones — and made the build
+     * unreproducible and configuration-cache-hostile.
+     *
+     * Polymorphism only needs the seed to differ between *shipped builds*,
+     * not between compiles of the same source. Deriving it from the
+     * project's identity and version gives a value that is stable within a
+     * version (so incremental builds cache correctly) and changes when the
+     * version is bumped for a release. `-PdroidshieldSeed=<n>` still pins
+     * it explicitly, which is what CI should use when it needs a specific
+     * build's ordering reproduced.
+     */
     private fun resolveSeed(target: Project): Long =
         (target.findProperty("droidshieldSeed") as? String)?.toLongOrNull()
-            ?: Random(System.nanoTime()).nextLong()
+            ?: Random("${target.path}:${target.version}".hashCode()).nextLong()
 }

@@ -18,12 +18,26 @@ class FridaNamedPipeCheck : ThreatCheck {
 
     private val candidateDirs = listOf("/data/local/tmp", "/proc/self/fd")
 
+    private val markers = listOf("frida", "linjector")
+
     override fun evaluate(context: CheckContext): CheckResult {
         val match = candidateDirs
             .mapNotNull { dir -> runCatching { File(dir).listFiles() }.getOrNull() }
             .flatMap { it.toList() }
-            .firstOrNull { it.name.contains("frida", ignoreCase = true) || it.name.contains("linjector", ignoreCase = true) }
+            .mapNotNull(::inspectablePath)
+            .firstOrNull { path -> markers.any { path.contains(it, ignoreCase = true) } }
 
-        return CheckResult(id, category, severity, detected = match != null, detail = match?.path)
+        return CheckResult(id, category, severity, detected = match != null, detail = match)
     }
+
+    /**
+     * Entries under `/proc/self/fd` are symlinks *named* after the file
+     * descriptor number ("0", "1", "2", ...) — matching on `name` there
+     * could never hit a marker, which made that half of this check dead.
+     * The frida-agent pipe/socket is only visible in the link *target*, so
+     * resolve it. `canonicalPath` on a deleted or anonymous target (e.g.
+     * `socket:[12345]`) throws, hence the fallback to the entry itself.
+     */
+    private fun inspectablePath(entry: File): String? =
+        runCatching { entry.canonicalPath }.getOrNull() ?: entry.path
 }

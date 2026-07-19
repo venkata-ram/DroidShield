@@ -35,7 +35,14 @@ class NativeLibraryIntegrityCheck(
         val libraryFile = File(nativeLibDir, libraryFileName)
 
         if (!libraryFile.exists()) {
-            return CheckResult(id, category, severity, detected = false, detail = "library not found")
+            // Reported clean before, which was backwards: reaching here
+            // means the integrator pinned a hash for this library (the
+            // blank-hash case already returned above), so the library is
+            // expected to be present. A pinned library that has vanished
+            // is exactly the stripping/patching this check exists to
+            // catch — failing open let an attacker defeat it by deleting
+            // the file rather than modifying it.
+            return CheckResult(id, category, severity, detected = true, detail = "library not found: $libraryFileName")
         }
 
         val actualHash = try {

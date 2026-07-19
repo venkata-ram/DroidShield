@@ -1,1 +1,36 @@
-<manifest xmlns:android="http://schemas.android.com/apk/res/android" />
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!--
+      Android 11 (API 30) package visibility: without these <queries>
+      entries, PackageManager.getPackageInfo() throws NameNotFoundException
+      for any package not otherwise visible to the host app, regardless of
+      whether that package is actually installed.
+
+      That broke two checks, in opposite directions:
+        - RootManagementAppCheck silently false-negatived (every root
+          manager read as "not installed").
+        - InstalledPackageHeuristicCheck false-*positived* on every real
+          device, because com.android.vending was invisible and therefore
+          read as "Play Store missing" -> emulator.
+
+      Declaring the exact packages the checks probe is the narrow fix. It
+      merges into the host app's manifest and, unlike QUERY_ALL_PACKAGES,
+      requires no Play Store policy declaration.
+    -->
+    <queries>
+        <!-- InstalledPackageHeuristicCheck -->
+        <package android:name="com.android.vending" />
+        <package android:name="com.genymotion.genyd" />
+        <package android:name="com.genymobile.gplay" />
+
+        <!-- RootManagementAppCheck -->
+        <package android:name="com.topjohnwu.magisk" />
+        <package android:name="eu.chainfire.supersu" />
+        <package android:name="com.noshufou.android.su" />
+        <package android:name="com.koushikdutta.superuser" />
+        <package android:name="com.thirdparty.superuser" />
+        <package android:name="com.yellowes.su" />
+        <package android:name="com.kingroot.kinguser" />
+        <package android:name="com.kingo.root" />
+        <package android:name="com.smedialink.oneclickroot" />
+    </queries>
+</manifest>

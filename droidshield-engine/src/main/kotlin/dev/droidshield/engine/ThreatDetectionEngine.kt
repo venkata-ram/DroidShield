@@ -19,7 +19,11 @@ class ThreatDetectionEngine(
     private val order: CheckOrder = CheckOrder.Unseeded,
 ) {
     fun runAll(context: CheckContext): List<CheckResult> {
-        telemetrySink.capture(TelemetryEvent("engine_initialized", mapOf("checkCount" to checks.size)))
+        // "engine_initialized" was a misnomer: runAll can be called any
+        // number of times over an engine's life, so this fired once per
+        // run and inflated any "installs"/"initializations" metric built
+        // on it. The event is per-run; name it that way.
+        telemetrySink.capture(TelemetryEvent("engine_run_started", mapOf("checkCount" to checks.size)))
 
         val ordered = order.apply(checks)
         val results = mutableListOf<CheckResult>()

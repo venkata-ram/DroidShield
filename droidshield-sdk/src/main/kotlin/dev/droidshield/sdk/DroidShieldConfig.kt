@@ -14,7 +14,16 @@ data class DroidShieldConfig(
     val tamperCheckedAssetPath: String = "",
     val expectedTamperCheckedAssetSha256: String = "",
     val expectedManifestDebuggable: Boolean = false,
-    val expectedManifestAllowBackup: Boolean = false,
+    /**
+     * Defaults to `true` to match the *platform's* default for
+     * `android:allowBackup`, which is `true` when the attribute is omitted
+     * from the manifest. Defaulting this to `false` made
+     * [dev.droidshield.data.checks.tamper.ManifestTamperCheck] report a
+     * tamper on every clean run of any app that hadn't explicitly opted
+     * out of backup. An integrator who does set
+     * `android:allowBackup="false"` must set this to `false` to match.
+     */
+    val expectedManifestAllowBackup: Boolean = true,
     val expectedInstallerPackage: String = "com.android.vending",
     /**
      * Per-build polymorphic seed (ARCHITECTURE.md §1/§8). Null means

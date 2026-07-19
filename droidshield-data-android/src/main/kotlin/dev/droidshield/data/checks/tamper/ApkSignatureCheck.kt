@@ -50,12 +50,16 @@ class ApkSignatureCheck(
 
         val signatures: Array<Signature> = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
             val info = pm.getPackageInfo(packageName, PackageManager.GET_SIGNING_CERTIFICATES)
-            val signingInfo = info.signingInfo
-            if (signingInfo?.hasMultipleSigners() == true) {
-                signingInfo.apkContentsSigners
-            } else {
-                signingInfo?.signingCertificateHistory ?: emptyArray()
-            }
+            // apkContentsSigners in both branches, deliberately.
+            // signingCertificateHistory returns every certificate this
+            // package has *ever* been signed with, including ones rotated
+            // away from — so an attacker holding a superseded key could
+            // repackage the app and still match a pinned hash. Only the
+            // certificate that actually signed the running APK is a valid
+            // anti-repackaging comparison, and that is what
+            // apkContentsSigners reports for single and multiple signers
+            // alike.
+            info.signingInfo?.apkContentsSigners ?: emptyArray()
         } else {
             @Suppress("DEPRECATION")
             val info = pm.getPackageInfo(packageName, PackageManager.GET_SIGNATURES)

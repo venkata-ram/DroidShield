@@ -20,11 +20,21 @@ class RootBuildFingerprintCheck : ThreatCheck {
     override val category: ThreatCategory = ThreatCategory.ROOT
     override val severity: Severity = Severity.LOW
 
-    private val customRomMarkers = listOf("test-keys", "userdebug", "eng")
+    /**
+     * A fingerprint is
+     * `brand/product/device:version/id/incremental:BUILD_TYPE/tags`, so the
+     * build type and tags are their own delimited fields. Matching the bare
+     * substring "eng" anywhere in the string (as this did) is far too loose
+     * — it hits any brand, product or incremental that merely happens to
+     * contain those three letters, on a device that is not modified at all.
+     * Anchor to the delimited fields instead.
+     */
+    private val customRomFingerprint =
+        Regex(""":(eng|userdebug)/|[/:]test-keys(\b|$)""", RegexOption.IGNORE_CASE)
 
     override fun evaluate(context: CheckContext): CheckResult {
         val fingerprint = Build.FINGERPRINT ?: ""
-        val match = customRomMarkers.firstOrNull { fingerprint.contains(it, ignoreCase = true) }
-        return CheckResult(id, category, severity, detected = match != null, detail = fingerprint)
+        val detected = customRomFingerprint.containsMatchIn(fingerprint)
+        return CheckResult(id, category, severity, detected = detected, detail = fingerprint)
     }
 }

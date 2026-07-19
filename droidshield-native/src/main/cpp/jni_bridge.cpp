@@ -1,5 +1,7 @@
 #include <jni.h>
 #include <sys/ptrace.h>
+#include <sys/wait.h>
+#include <unistd.h>
 #include <signal.h>
 #include <csetjmp>
 #include <atomic>
@@ -17,20 +19,98 @@ Java_dev_droidshield_nativelayer_NativeBridge_isLoaded(JNIEnv *, jobject) {
     return JNI_TRUE;
 }
 
-// CHECKS_SEED_LIST.md DEBUGGER #6 — ptrace self-attach. If a debugger (or
-// a ptrace-based tool like Frida) is already attached to this process,
-// PTRACE_TRACEME fails because a process can only be traced by one tracer
-// at a time. On success we immediately detach so this check doesn't itself
-// leave the process in a traced state for the rest of its life.
+// CHECKS_SEED_LIST.md DEBUGGER #6 — ptrace self-attach.
+//
+// This previously ran PTRACE_TRACEME in the app process itself and then
+// tried to undo it with ptrace(PTRACE_DETACH, 0, ...). That detach never
+// worked: PTRACE_DETACH must be issued *by the tracer*, against the
+// tracee's pid — a tracee cannot untrace itself, and pid 0 is not a valid
+// target. So on every clean device the check left the app permanently
+// traced by its parent (zygote). A traced process stops on the next
+// signal delivery and stays stopped until its tracer reaps it, and zygote
+// never will, so the app could freeze outright; it also blocked any
+// later legitimate debugger attach for the life of the process.
+//
+// The detection is now done from a short-lived forked child instead, so
+// the app process is never put into a traced state at all. If the child
+// can PTRACE_ATTACH to its parent, nothing else holds the parent's single
+// tracer slot; if it cannot, we corroborate via TracerPid before calling
+// it a detection, because an attach can also be refused for reasons that
+// have nothing to do with a debugger (Yama ptrace_scope=1 denies tracing
+// a non-descendant, which is exactly the child->parent direction here).
+namespace {
+// Reads the TracerPid field of /proc/<pid>/status. Returns -1 if it can't
+// be determined, 0 when untraced, otherwise the tracer's pid.
+int read_tracer_pid(pid_t pid) {
+    char path[64];
+    snprintf(path, sizeof(path), "/proc/%d/status", pid);
+    FILE *status = fopen(path, "r");
+    if (status == nullptr) {
+        return -1;
+    }
+
+    int tracerPid = -1;
+    char line[256];
+    while (fgets(line, sizeof(line), status) != nullptr) {
+        if (sscanf(line, "TracerPid: %d", &tracerPid) == 1) {
+            break;
+        }
+    }
+    fclose(status);
+    return tracerPid;
+}
+}  // namespace
+
 extern "C" JNIEXPORT jboolean JNICALL
 Java_dev_droidshield_nativelayer_NativeBridge_ptraceSelfAttachDetectsTracer(JNIEnv *, jobject) {
-    long result = ptrace(PTRACE_TRACEME, 0, nullptr, nullptr);
-    if (result == -1) {
-        // Already traced by something else.
-        return JNI_TRUE;
+    const pid_t parent = getpid();
+
+    int pipeFds[2];
+    if (pipe(pipeFds) != 0) {
+        return JNI_FALSE;
     }
-    ptrace(PTRACE_DETACH, 0, nullptr, nullptr);
-    return JNI_FALSE;
+
+    const pid_t child = fork();
+    if (child < 0) {
+        close(pipeFds[0]);
+        close(pipeFds[1]);
+        return JNI_FALSE;
+    }
+
+    if (child == 0) {
+        // Child: async-signal-safe work only, then _exit (never exit(),
+        // which would run the parent's atexit handlers in this copy).
+        close(pipeFds[0]);
+
+        char traced = 0;
+        if (ptrace(PTRACE_ATTACH, parent, nullptr, nullptr) == -1) {
+            // Attach refused. Only a confirmed non-zero TracerPid that
+            // isn't us counts as a real tracer; anything else (Yama,
+            // SELinux, unreadable /proc) is inconclusive, not a threat.
+            const int tracerPid = read_tracer_pid(parent);
+            traced = (tracerPid > 0 && tracerPid != getpid()) ? 1 : 0;
+        } else {
+            // We now own the parent's tracer slot; hand it straight back.
+            waitpid(parent, nullptr, 0);
+            ptrace(PTRACE_DETACH, parent, nullptr, nullptr);
+        }
+
+        ssize_t ignored = write(pipeFds[1], &traced, 1);
+        (void) ignored;
+        close(pipeFds[1]);
+        _exit(0);
+    }
+
+    close(pipeFds[1]);
+    char result = 0;
+    const ssize_t bytesRead = read(pipeFds[0], &result, 1);
+    close(pipeFds[0]);
+    waitpid(child, nullptr, 0);
+
+    if (bytesRead != 1) {
+        return JNI_FALSE;
+    }
+    return result ? JNI_TRUE : JNI_FALSE;
 }
 
 // CHECKS_SEED_LIST.md DEBUGGER #8 — native breakpoint / signal handler

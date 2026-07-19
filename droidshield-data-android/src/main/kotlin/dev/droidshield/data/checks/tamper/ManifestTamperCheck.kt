@@ -17,7 +17,9 @@ import dev.droidshield.domain.ThreatCheck
  */
 class ManifestTamperCheck(
     private val expectedDebuggable: Boolean = false,
-    private val expectedAllowBackup: Boolean = false,
+    // `true` matches the platform default for a manifest that omits
+    // android:allowBackup — see DroidShieldConfig.expectedManifestAllowBackup.
+    private val expectedAllowBackup: Boolean = true,
 ) : ThreatCheck {
     override val id: String = "tamper.manifest_flags"
     override val category: ThreatCategory = ThreatCategory.TAMPER
