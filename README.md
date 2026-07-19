@@ -1,6 +1,6 @@
 # DroidShield
 
-Runtime application self-protection (RASP) for Android — one Gradle dependency, no backend, no SDK account.
+Runtime application self-protection (RASP) for Android.
 
 DroidShield answers one question at runtime: **is this app running in an environment I should trust?** It runs 40 checks across five threat categories — root, debugger, hooking frameworks, emulator, and tamper/repackaging — and hands you the results. What you do with them is entirely your call.
 
