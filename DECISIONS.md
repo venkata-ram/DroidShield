@@ -642,3 +642,219 @@ match to existing architecture vocabulary.
 
 ---
 
+## D025 — Checks skipped from CHECKS_SEED_LIST.md, and why
+
+**Date:** 2026-07-19
+**Status:** Decided
+
+**Decision:** Of the 50 candidate techniques in `CHECKS_SEED_LIST.md`, 9
+were not implemented as `ThreatCheck`s. Each is a genuine per-technique
+call, not a scope cut:
+
+- **ROOT #7 (missing Google OTA certificate)** — no reliable public API to
+  check for OTA certificate presence; implementing it would mean guessing
+  at an unstable heuristic. Skipped rather than shipped as a check that
+  looks authoritative but isn't.
+- **ROOT #10 (RootBeer-style aggregate)** — the seed list itself frames
+  this as "a fallback/reference baseline... not to depend on directly,"
+  not a technique to implement.
+- **DEBUGGER #9 (inotify-based memory dump detection)** — needs
+  persistent background file-system watching; `ThreatCheck.evaluate()` is
+  a synchronous, single-shot call (ARCHITECTURE.md §4). Forcing a
+  stateful/async technique into a synchronous contract would be the "bad
+  fit" the COT_PROMPT's Stage 6 self-check explicitly warns against.
+- **DEBUGGER #10 (anti-debug at multiple layers)** — a design instruction
+  ("duplicate a subset of the above at both layers"), not a discrete
+  technique. Satisfied structurally by having both `TracerPidCheck`
+  (Kotlin) and `PtraceSelfAttachCheck` (native) rather than as its own
+  check class.
+- **HOOK #9 (watchdog thread pattern)** — same contract mismatch as
+  DEBUGGER #9: a background thread re-verifying checks haven't been
+  patched out doesn't fit a single synchronous `evaluate()` call.
+- **HOOK #10 (reaction-on-detection design note)** — explicitly "not a
+  detection method itself" per the seed list; already satisfied by
+  `CheckResult.severity` existing for integrators to key a response on.
+- **EMULATOR #8 (OpenGL renderer string check)** — querying the GL
+  renderer needs a live EGL/GL rendering context, which conflicts with
+  DroidShield being a headless library with no `Activity`/UI dependency
+  (D015). Implementing it would mean either silently requiring a
+  `GLSurfaceView` from the integrator or a hidden/unstable API path — both
+  worse than not implementing it.
+- **TAMPER #8 (anti-repackaging logic-bomb pattern)** — the seed list
+  itself flags this as "an advanced/V2 pattern... implementation-heavy,"
+  not a V1 `ThreatCheck`.
+- **TAMPER #9 (Play Integrity API integration point)** — the seed list
+  itself frames this as "not a DroidShield-native check," and D001 (no
+  bundled vendor dependencies) rules out adding a Play Integrity
+  dependency to the core `.aar` regardless.
+
+**Alternatives considered:** Implement weaker/partial versions of all 9
+anyway to hit "10 per category." Rejected — `CHECKS_SEED_LIST.md` itself
+explicitly instructs against padding the list with filler, and a
+weak-on-purpose check that looks real is worse than an honestly-absent
+one for a security tool.
+
+---
+
+## D026 — Polymorphic build variance via Gradle-plugin source codegen, not ASM bytecode instrumentation
+
+**Date:** 2026-07-19
+**Status:** Revisitable
+
+**Decision:** `droidshield-gradle-plugin` generates one Kotlin source file
+per build (`DroidShieldBuildSeed.SEED`, a `Long`) and wires it into the
+host app's Kotlin compilation. The engine's `CheckOrder.Seeded` (see
+`droidshield-engine/CheckOrder.kt`) uses that seed to shuffle check order
+and optionally select a subset at *runtime*. No ASM `AsmClassVisitorFactory`
+bytecode rewriting of host-app classes is implemented.
+
+**Reasoning:** `ARCHITECTURE.md` §3 originally assumed AGP Instrumentation
+API + ASM class visitors as the mechanism. Implementing real ASM bytecode
+rewriting correctly — visiting arbitrary host-app classes, injecting calls
+at the right point, handling every AGP variant/build-type combination —
+is genuinely high-risk to get right without iterative testing against a
+running host app on a device, which wasn't available in this environment.
+A subtly wrong ASM visitor doesn't fail loudly; it silently corrupts or
+skips host-app bytecode, which is a far worse failure mode for a
+security SDK than a less exotic mechanism. Source-codegen achieves the
+actual stated goal from ARCHITECTURE.md §1 — "each build assembles a
+different subset/ordering... of checks" — without touching host bytecode
+at all: the seed varies every build (or is pinned via
+`-PdroidshieldSeed=<n>` for reproducible testing), and `CheckOrder.Seeded`
+does the actual subset/ordering variance at runtime. This was verified
+working end-to-end in this environment: the generated
+`DroidShieldBuildSeed` class was confirmed present in the sample app's
+compiled, packaged APK (`classes13.dex`, via `dexdump`).
+
+**What this does NOT achieve, compared to true ASM instrumentation:**
+varying *where in the host app's bytecode* checks get invoked from, or
+injecting checks into arbitrary host classes without any code on the
+integrator's part. The current mechanism still requires the integrator to
+explicitly call `DroidShield.init()` — it doesn't auto-inject that call.
+
+**Alternatives considered:** Implement ASM instrumentation anyway, accept
+the risk. Rejected for this pass — the risk/verification tradeoff was
+judged unacceptable without device-level testing available.
+
+**Revisit trigger:** If auto-injecting the `DroidShield.init()` call
+itself (not just varying check order/subset) becomes a real requirement,
+revisit ASM instrumentation specifically for that narrower goal, with
+device-level test coverage as a precondition for shipping it.
+
+---
+
+## D027 — `droidshield-gradle-plugin` is a standalone included build, not a regular subproject
+
+**Date:** 2026-07-19
+**Status:** Decided
+
+**Decision:** `droidshield-gradle-plugin` has its own `settings.gradle.kts`
+and is consumed via `pluginManagement { includeBuild("droidshield-gradle-plugin") }`
+in the root `settings.gradle.kts`, rather than being listed in the root's
+`include(...)` block.
+
+**Reasoning:** Verified directly in this environment: a Gradle plugin
+can't be applied via the `plugins { id("...") }` DSL from a sibling
+subproject in the same build — that DSL resolves against Gradle's plugin
+resolution mechanism (plugin portal / included builds), not the regular
+project dependency graph. Since `sample-app` needed to actually apply
+`id("dev.droidshield")` to prove the seed-codegen mechanism works
+end-to-end (not just compile in isolation), the plugin had to become
+resolvable as an actual Gradle plugin, which requires either publishing it
+or using `includeBuild`. `includeBuild` was chosen since publishing isn't
+applicable pre-release.
+
+**Consequence:** This is also why D003/D022's module-boundary reasoning
+(engine and native modules never depending on Gradle/AGP internals) paid
+off unexpectedly — `droidshield-gradle-plugin` had an unused
+`api(project(":droidshield-engine"))` dependency at the time this was
+discovered, which was removed as part of this change (D023's scaffold
+declared it speculatively; the actual seed-codegen implementation never
+needed it). Had the plugin genuinely needed an engine dependency, the
+included-build conversion would have created a circular composite-build
+reference (included build depending back on the including build), which
+Gradle doesn't support — a real constraint worth remembering if a future
+change tries to give the plugin a project dependency back into the main
+build.
+
+**Alternatives considered:** Keep it a regular subproject and only unit-test
+`DroidShieldPlugin` in isolation (e.g. via `ProjectBuilder`), without
+proving it applies to a real Android module. Rejected — an untested
+"plugin applies to a real host app" path is exactly the kind of gap that
+looks done but isn't; the whole point of building `sample-app` was to
+verify integration, not just compilation.
+
+---
+
+## D028 — Generated Kotlin sources wired via KGP's `sourceSets`, not AGP's `variant.sources.kotlin`
+
+**Date:** 2026-07-19
+**Status:** Decided
+
+**Decision:** `DroidShieldPlugin` adds the generated-seed output directory
+to the Kotlin Gradle Plugin's own source set
+(`KotlinAndroidProjectExtension.sourceSets.getByName("main").kotlin.srcDir(...)`),
+not via AGP's `AndroidComponentsExtension` → `variant.sources.kotlin?.addGeneratedSourceDirectory(...)`.
+
+**Reasoning:** Verified directly in this environment, the hard way. The
+first implementation used `variant.sources.kotlin?.addGeneratedSourceDirectory(...)`
+(AGP 8.7.2's public Variant API). It compiled cleanly and even appeared to
+work — the generated-source task ran and AGP redirected its output
+directory to AGP's own managed convention path
+(`build/generated/kotlin/generateDroidShieldSeed/...`), which is the
+expected symptom of the wiring call actually executing. But
+`:sample-app:compileDebugKotlin` still failed with "Unresolved reference"
+for the generated class — `variant.sources.kotlin` accepted the
+registration but that bucket is never actually consumed by
+`compileDebugKotlin` for a plain (non-Kotlin-Multiplatform)
+Android+Kotlin module on this AGP 8.7.2 / Kotlin 2.0.21 combination. This
+looks like a real, currently-existing gap in that AGP/KGP version
+combination's integration, not a mistake in how the API was called. The
+Kotlin Gradle Plugin's own `sourceSets` API is the mechanism actually
+consumed by `compileDebugKotlin` — switching to it fixed the failure, and
+was confirmed by finding the generated `DroidShieldBuildSeed` class
+directly inside a `dexdump` of the built APK's DEX files.
+
+**Alternatives considered:** None — this was found empirically after the
+"obviously correct" AGP-native approach silently failed to wire through,
+so there wasn't a menu of options being compared; there was one approach
+that looked right and didn't work, and one that was verified to work.
+
+**Revisit trigger:** If a future AGP/Kotlin version combination properly
+threads `variant.sources.kotlin` through to `compileDebugKotlin` for
+plain Android+Kotlin modules (not just KMP), the KGP-specific wiring could
+be simplified back to the AGP-native API — but only after re-verifying
+with the same dexdump-level proof used here, not just "it compiles."
+
+---
+
+## D029 — TAMPER checks needing integrator-supplied config default to "not configured" (a clean, non-detecting result) rather than failing
+
+**Date:** 2026-07-19
+**Status:** Decided
+
+**Decision:** `ApkSignatureCheck`, `DexIntegrityCheck`,
+`NativeLibraryIntegrityCheck`, and `AssetTamperCheck` all take expected
+hash/CRC values the integrator must supply (via `DroidShieldConfig`).
+When left at their empty/blank defaults, each returns
+`CheckResult(detected = false, detail = "not configured")` rather than
+throwing or returning a false positive.
+
+**Reasoning:** DroidShield cannot know an integrator's actual release
+signing hash or DEX checksums — there's no default that would be
+meaningful (ARCHITECTURE.md's "no backend, no assumptions" principle
+extends to build secrets too). Returning `detected = false` for an
+unconfigured check means: enabling `TamperChecksModule` doesn't
+immediately spam an integrator with false-positive threat reports before
+they've filled in their real values, but the `detail = "not configured"`
+field makes the gap visible to anyone actually inspecting results (as
+opposed to silently and invisibly no-op'ing).
+
+**Alternatives considered:** Throw an exception if unconfigured, forcing
+the integrator to notice immediately. Rejected — `ThreatDetectionEngine`
+already treats a thrown exception as a `check_error` and skips the result
+(see `ThreatDetectionEngine.kt`), which would make an unconfigured check
+indistinguishable from a genuinely broken one in telemetry, losing the
+more specific "not configured" signal.
+
+---
