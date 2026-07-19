@@ -1,0 +1,21 @@
+[versions]
+# See DECISIONS.md D017 for why these specific versions were pinned.
+kotlin = "2.0.21"
+agp = "8.7.2"
+dagger = "2.52"
+androidx-core = "1.13.1"
+junit = "4.13.2"
+truth = "1.4.4"
+
+[libraries]
+dagger = { module = "com.google.dagger:dagger", version.ref = "dagger" }
+dagger-compiler = { module = "com.google.dagger:dagger-compiler", version.ref = "dagger" }
+androidx-core = { module = "androidx.core:core-ktx", version.ref = "androidx-core" }
+junit = { module = "junit:junit", version.ref = "junit" }
+truth = { module = "com.google.truth:truth", version.ref = "truth" }
+
+[plugins]
+android-library = { id = "com.android.library", version.ref = "agp" }
+android-application = { id = "com.android.application", version.ref = "agp" }
+kotlin-android = { id = "org.jetbrains.kotlin.android", version.ref = "kotlin" }
+kotlin-jvm = { id = "org.jetbrains.kotlin.jvm", version.ref = "kotlin" }
