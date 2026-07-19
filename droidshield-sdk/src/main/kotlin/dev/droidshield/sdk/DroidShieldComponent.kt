@@ -3,6 +3,7 @@ package dev.droidshield.sdk
 import android.content.Context
 import dagger.BindsInstance
 import dagger.Component
+import dev.droidshield.domain.TelemetrySink
 import dev.droidshield.engine.ThreatDetectionEngine
 import dev.droidshield.sdk.checks.ChecksModule
 import javax.inject.Singleton
@@ -12,6 +13,7 @@ import javax.inject.Singleton
 @Component(modules = [ChecksModule::class, ReportingModule::class, TelemetryModule::class, EngineModule::class])
 internal interface DroidShieldComponent {
     fun engine(): ThreatDetectionEngine
+    fun telemetrySink(): TelemetrySink
 
     @Component.Factory
     interface Factory {

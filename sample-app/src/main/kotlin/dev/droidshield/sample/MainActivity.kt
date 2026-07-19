@@ -3,6 +3,7 @@ package dev.droidshield.sample
 import android.app.Activity
 import android.os.Bundle
 import android.widget.TextView
+import dev.droidshield.sdk.DroidShieldGuarded
 
 /**
  * Exists only so the sample app has something for the launcher to point
@@ -12,6 +13,7 @@ import android.widget.TextView
  * [SampleApplication] under the "DroidShieldSample" logcat tag.
  */
 class MainActivity : Activity() {
+    @DroidShieldGuarded("sample.main_activity.opened")
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(

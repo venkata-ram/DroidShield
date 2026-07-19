@@ -1116,3 +1116,40 @@ does not expose `CheckOrder`'s subset fraction, and the plugin does not rewrite 
 classes. Stable seeds also preserve incremental builds and reproducibility. Naming the
 actual mechanism makes its benefit and limitations clear without presenting ordering
 variation as a complete anti-bypass boundary.
+
+## D037 — Guarded methods use opt-in AGP instrumentation and asynchronous checks
+
+**Date:** 2026-07-19
+**Status:** Decided
+
+**Supersedes:** D026/D036 only where they state that the plugin does not rewrite
+host-app bytecode. Their source-generation and release-seeded-ordering decisions remain.
+
+**Decision:** The Gradle plugin instruments application-project methods explicitly
+annotated with `@DroidShieldGuarded`. It injects one call to
+`DroidShieldGuardRuntime.onGuardedMethodEntered` at method entry using AGP's supported
+ASM instrumentation API and `InstrumentationScope.PROJECT`; dependencies are never
+rewritten. The runtime bridge schedules the normal check set on a single background
+executor, coalesces concurrent triggers, and applies a configurable 30-second cooldown.
+Calls before `DroidShield.init()` are no-ops.
+Accepted triggers emit `guarded_method_triggered` telemetry with the stable operation
+identifier; identifiers must describe code paths, not users or request data.
+
+The plugin also attaches a release-hardening verification task to `preReleaseBuild`.
+By default it rejects debuggable releases and releases without both R8 minification and
+resource shrinking. Both instrumentation and enforcement have explicit opt-outs in the
+`droidShield` extension for diagnosis and staged adoption.
+
+**Reasoning:** Security checks only at process startup leave a simple timing gap. An
+annotation gives integrators precise control over sensitive boundaries while avoiding
+fragile guessing about Activity, Compose, coroutine, or framework lifecycles. Running
+checks inline would add disk, process, and socket work to the protected operation, so
+the injected call is deliberately non-blocking and rate-limited. A build-time release
+gate turns three objective hardening settings into a verifiable invariant rather than a
+README recommendation.
+
+**Limits accepted:** Instrumentation raises coverage and attacker effort; it is not an
+unbypassable enforcement boundary. Operation identifiers are diagnostics, not secrets.
+The most recently initialized DroidShield instance backs injected triggers, matching the
+normal single-instance application integration; unusual multi-instance tests should not
+depend on the global guarded-method bridge.

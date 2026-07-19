@@ -63,11 +63,11 @@ plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
     // Generates the version-derived ordering seed. Optional — see Scenario 5.
-    id("com.github.venkata-ram.DroidShield") version "0.3.2"
+    id("com.github.venkata-ram.DroidShield") version "0.4.0"
 }
 
 dependencies {
-    implementation("com.github.venkata-ram.DroidShield:droidshield-sdk:0.3.2")
+    implementation("com.github.venkata-ram.DroidShield:droidshield-sdk:0.4.0")
 }
 ```
 
@@ -88,7 +88,7 @@ JitPack rewrites to `com.github.…` only on publish — so the coordinate diffe
 JitPack one:
 
 ```kotlin
-implementation("dev.droidshield:droidshield-sdk:0.3.2")
+implementation("dev.droidshield:droidshield-sdk:0.4.0")
 ```
 
 The **plugin** is not subject to that: its group is pinned to
@@ -222,7 +222,7 @@ DroidShield.init(
 
 ### Scenario 5 — Turn on release-seeded check ordering
 
-Apply the `dev.droidshield` plugin, then feed the generated seed in:
+Apply the `com.github.venkata-ram.DroidShield` plugin, then feed the generated seed in:
 
 ```kotlin
 import dev.droidshield.generated.DroidShieldBuildSeed
@@ -235,12 +235,57 @@ DroidShield.init(
 
 The seed is derived from your project path and version, so it's stable across incremental builds (no spurious recompiles) and changes when you bump the version for a release. Pin it in CI with `-PdroidshieldSeed=12345` when you need to reproduce a specific build's ordering.
 
-This changes execution order only. It does not inject calls into host-app bytecode,
-generate different check implementations, or make a release immune to bypasses.
+The seed changes execution order only. Guarded-method instrumentation is the separate,
+explicitly annotated feature below; neither feature makes a release immune to bypasses.
 
 Leave `polymorphicSeed` null and checks run in deterministic declaration order — which is what you want in tests.
 
-### Scenario 6 — Run checks periodically, not just at startup
+### Scenario 6 — Guard a security-sensitive method
+
+Apply the Gradle plugin and annotate an application method:
+
+```kotlin
+import dev.droidshield.sdk.DroidShieldGuarded
+
+@DroidShieldGuarded("checkout.submit")
+fun submitPayment() {
+    // The plugin injects a DroidShield trigger before this body.
+}
+```
+
+`DroidShield.init(...)` installs the runtime bridge. Each guarded entry schedules the
+normal check set on a dedicated background executor, so the application method is not
+blocked. Concurrent entries are coalesced and subsequent runs are rate-limited to 30
+seconds by default:
+
+```kotlin
+DroidShieldConfig(guardedMethodMinIntervalMillis = 60_000L)
+```
+
+Calls before `DroidShield.init(...)` are ignored. Only methods in the Android application
+module are instrumented; dependency bytecode is never rewritten. Disable instrumentation
+when diagnosing a build with:
+
+```kotlin
+droidShield {
+    instrumentGuardedMethods.set(false)
+}
+```
+
+Annotate concrete, non-inline methods. Kotlin inline call sites are expanded before AGP
+instrumentation and therefore cannot provide a reliable guarded boundary.
+
+The plugin also attaches `verifyDroidShieldReleaseHardening` to `preReleaseBuild`. A
+release fails if it is debuggable, R8 minification is disabled, or resource shrinking is
+disabled. During a staged migration, downgrade failures to warnings explicitly:
+
+```kotlin
+droidShield {
+    enforceReleaseHardening.set(false)
+}
+```
+
+### Scenario 7 — Run checks periodically, not just at startup
 
 A one-shot check at launch is easy to sidestep: attach Frida after startup. Re-run on a background thread whenever it matters — app resume, before a payment, on session refresh.
 
@@ -253,7 +298,7 @@ class ThreatWorker(ctx: Context, params: WorkerParameters) : Worker(ctx, params)
 }
 ```
 
-### Scenario 7 — Send operational telemetry somewhere
+### Scenario 8 — Send operational telemetry somewhere
 
 `TelemetrySink` is separate from `ThreatReporter` on purpose. Threat signals are security data; telemetry is "is the SDK healthy" data (`engine_run_started`, `check_executed`, `check_error`). Conflating them would force anyone wanting basic usage analytics into the threat-reporting business.
 
@@ -267,8 +312,10 @@ DroidShield.init(context, telemetrySink = PostHogSink(posthog))
 ```
 
 Default payloads carry no PII and no raw stack traces. Anything richer is your explicit opt-in.
+Guarded-method runs additionally emit `guarded_method_triggered` with the stable
+operation identifier supplied by the application; do not place user data in that identifier.
 
-### Scenario 8 — Add your own check
+### Scenario 9 — Add your own check
 
 ```kotlin
 // droidshield-data-android/.../checks/root/MyCheck.kt
@@ -304,7 +351,7 @@ That's it. The engine picks it up, seeded ordering includes it, telemetry wraps 
 | `droidshield-data-android` | 36 checks using Android APIs — `PackageManager`, `Build`, `/proc`. Most contributions land here. |
 | `droidshield-native` | C++ checks + JNI bridge → `libdroidshield.so`. |
 | `droidshield-engine` | `ThreatDetectionEngine` + `CheckOrder`. Knows nothing about specific checks. |
-| `droidshield-gradle-plugin` | Version-derived ordering-seed generation. |
+| `droidshield-gradle-plugin` | Guarded-method bytecode instrumentation, release-hardening verification, and version-derived ordering-seed generation. |
 | `droidshield-sdk` | The public `.aar` — the `DroidShield` facade and Dagger graph. |
 | `sample-app` | Working end-to-end integration. A standalone build consuming the JitPack artifacts — not part of the root build. |
 

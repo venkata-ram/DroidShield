@@ -56,6 +56,7 @@ dependencies {
 
     testImplementation(libs.junit)
     testImplementation(libs.truth)
+    testImplementation("org.ow2.asm:asm:9.7.1")
 }
 
 gradlePlugin {

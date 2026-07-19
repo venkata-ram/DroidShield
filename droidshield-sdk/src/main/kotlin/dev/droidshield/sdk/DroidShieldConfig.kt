@@ -31,4 +31,12 @@ data class DroidShieldConfig(
      * Gradle plugin generates it.
      */
     val polymorphicSeed: Long? = null,
-)
+    /** Minimum delay between check runs triggered by [DroidShieldGuarded] methods. */
+    val guardedMethodMinIntervalMillis: Long = 30_000L,
+) {
+    init {
+        require(guardedMethodMinIntervalMillis >= 0L) {
+            "guardedMethodMinIntervalMillis must be non-negative"
+        }
+    }
+}

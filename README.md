@@ -35,7 +35,7 @@ Then depend on the SDK — `droidshield-sdk` pulls in the domain, check, native 
 ```kotlin
 // app/build.gradle.kts
 dependencies {
-    implementation("com.github.venkata-ram.DroidShield:droidshield-sdk:0.3.2")
+    implementation("com.github.venkata-ram.DroidShield:droidshield-sdk:0.4.0")
 }
 ```
 
@@ -56,20 +56,37 @@ data class CheckResult(
 )
 ```
 
-That's the whole runtime setup — no `resolutionStrategy`, no extra plumbing. Release-seeded check ordering additionally uses the Gradle plugin, which installs the same way:
+That's the whole runtime setup — no `resolutionStrategy`, no extra plumbing. The
+Gradle plugin adds release-seeded ordering, guarded-method instrumentation, and a
+release-hardening gate:
 
 ```kotlin
 // app/build.gradle.kts
 plugins {
-    id("com.github.venkata-ram.DroidShield") version "0.3.2"
+    id("com.github.venkata-ram.DroidShield") version "0.4.0"
 }
 ```
+
+Mark security-sensitive entry points and the plugin injects a background threat-check
+trigger at the beginning of each method:
+
+```kotlin
+@DroidShieldGuarded("checkout.submit")
+fun submitPayment() {
+    // original application code
+}
+```
+
+Injected triggers are rate-limited and never run checks on the caller thread. Release
+builds also fail when they are debuggable or omit R8 minification/resource shrinking.
 
 See **[INTEGRATION.md](INTEGRATION.md)** for what the plugin does and the other integration scenarios.
 
 ## What's different about it
 
-- **Release-seeded check ordering.** A Gradle plugin derives a reproducible seed from the project and version; the engine uses it to shuffle check execution. This adds variation between releases and can disrupt tooling that assumes a fixed sequence, but it is not code injection or a guarantee against bypasses.
+- **Checks at the operations that matter.** Annotate login, payment, token, or other sensitive methods with `@DroidShieldGuarded`; the Gradle plugin injects a non-blocking, rate-limited threat-check trigger into each method's bytecode.
+- **Release hardening as a build invariant.** Release builds fail fast if they are debuggable or ship without R8 minification and resource shrinking. Teams can explicitly downgrade the gate when migration requires it.
+- **Release-seeded check ordering.** The plugin also derives a reproducible seed from the project and version; the engine uses it to shuffle check execution between configured releases.
 - **Native checks where they matter.** Anti-debug (`ptrace` self-attach), `/proc/self/maps` scanning, trampoline-hook detection, and native checksumming live in C++, not Kotlin. This gives attackers an additional native analysis surface; it does not make the checks unpatchable.
 - **No DroidShield-hosted backend.** No dashboard, hosted service, or default phone-home behavior. `ThreatReporter` is a one-method interface you implement; your threat signals go where *you* send them.
 - **No bundled analytics vendor.** Telemetry defaults to a no-op sink. The SDK does use documented runtime libraries such as Dagger, Kotlin coroutines, and AndroidX.
@@ -88,7 +105,7 @@ cd sample-app && ../gradlew assembleDebug
 ## Documentation
 
 - [CONTRIBUTING.md](CONTRIBUTING.md) — development setup, check design rules, tests, and pull-request expectations
-- [INTEGRATION.md](INTEGRATION.md) — setup, configuration, and eight usage scenarios
+- [INTEGRATION.md](INTEGRATION.md) — setup, configuration, and nine usage scenarios
 - [SERVER_DRIVEN_DECISIONS.md](SERVER_DRIVEN_DECISIONS.md) — letting your backend, not the APK, decide how to respond to threats
 - [ARCHITECTURE.md](ARCHITECTURE.md) — module layering and the extensibility contract
 - [DECISIONS.md](DECISIONS.md) — append-only rationale log

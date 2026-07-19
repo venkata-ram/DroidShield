@@ -16,9 +16,9 @@ Status: V1 scope. See `DECISIONS.md` for the append-only decision log and
   lock-in. The host app decides where threat signals and optional telemetry go.
 - Native (`.so`) layer for checks that are meaningfully harder to bypass in
   native code than in Java/Kotlin.
-- Release-seeded ordering: the Gradle plugin generates a reproducible seed that
-  the runtime engine can use to vary check execution order between versions.
-  This is source generation, not host-app bytecode injection.
+- Build-time hardening: the Gradle plugin instruments explicitly annotated
+  security-sensitive application methods, rejects weak release build settings,
+  and generates a reproducible seed for ordering variation between versions.
 
 **Explicit non-goals for V1**
 - Claiming to be a complete RASP product. Automatic prevention, enforcement,
@@ -41,8 +41,8 @@ imports, and outer layers are swappable without touching detection logic.
 
 ```
 ┌─────────────────────────────────────────────────────────┐
-│  build-plugin        (Gradle/Kotlin source generation of  │
-│                        a reproducible release seed)       │
+│  build-plugin        (guarded-method ASM instrumentation, │
+│                        release verification, seed codegen)│
 ├─────────────────────────────────────────────────────────┤
 │  data                (native bridge / JNI, Android APIs:  │
 │                        PackageManager, Build, /proc, etc) │
@@ -74,7 +74,7 @@ droidshield/
 ├── droidshield-data-android/    # ThreatCheck implementations (Java/Kotlin side)
 ├── droidshield-native/          # C++ checks + JNI bridge, builds libdroidshield.so
 ├── droidshield-engine/          # check runner and seeded ordering
-├── droidshield-gradle-plugin/   # build-seed source generation
+├── droidshield-gradle-plugin/   # instrumentation, release gate, seed generation
 ├── droidshield-sdk/             # public runtime .aar — DroidShield facade, DI graph
 └── sample-app/                  # demo app — standalone build, consumes JitPack artifacts
 ```
@@ -112,9 +112,10 @@ This is intentionally the smallest, most stable module: it should rarely need
 to change when checks are added.
 
 ### droidshield-gradle-plugin
-Generates a Kotlin source file containing a reproducible seed derived from the
-consumer project and version. The host app passes that seed to `DroidShieldConfig`
-to enable runtime ordering variation. It does not rewrite host-app bytecode.
+Instruments application methods marked `@DroidShieldGuarded`, verifies minimum
+release hardening, and generates a reproducible seed derived from the consumer
+project and version. Only project classes with the explicit annotation receive
+an injected call; dependency bytecode is outside the instrumentation scope.
 
 ### droidshield-sdk
 The public `.aar`. Contains the `DroidShield` facade (the only class most

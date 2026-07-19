@@ -5,6 +5,7 @@ import android.os.Build
 import dev.droidshield.data.AndroidCheckContext
 import dev.droidshield.domain.CheckResult
 import dev.droidshield.domain.ThreatReporter
+import dev.droidshield.domain.TelemetryEvent
 import dev.droidshield.domain.TelemetrySink
 import dev.droidshield.domain.backend.DeviceEvidence
 import dev.droidshield.domain.backend.EvidenceContext
@@ -36,6 +37,13 @@ class DroidShield private constructor(
     fun runChecks(): List<CheckResult> {
         val engine = component.engine()
         return engine.runAll(AndroidCheckContext(androidContext))
+    }
+
+    internal fun runGuardedChecks(operationId: String): List<CheckResult> {
+        component.telemetrySink().capture(
+            TelemetryEvent("guarded_method_triggered", mapOf("operationId" to operationId)),
+        )
+        return runChecks()
     }
 
     /**
@@ -100,7 +108,9 @@ class DroidShield private constructor(
                 ReportingModule(reporter),
                 TelemetryModule(telemetrySink),
             )
-            return DroidShield(component, applicationContext)
+            return DroidShield(component, applicationContext).also {
+                DroidShieldGuardRuntime.install(it, config.guardedMethodMinIntervalMillis)
+            }
         }
     }
 }
