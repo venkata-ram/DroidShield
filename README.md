@@ -46,9 +46,13 @@ The JitPack repository and Gradle plugin setup take a few more lines — see **[
 
 DroidShield is headless: it never shows a dialog or kills your process. It reports, you decide.
 
-## Not in V1
+## Sample app
 
-SSL pinning / network hardening, any hosted dashboard, BFSI compliance mapping, and a Rust native layer.
+[`sample-app/`](sample-app) is a standalone Gradle build that consumes DroidShield from JitPack exactly as an integrator would — no project dependencies:
+
+```bash
+cd sample-app && ../gradlew assembleDebug
+```
 
 ## Documentation
 

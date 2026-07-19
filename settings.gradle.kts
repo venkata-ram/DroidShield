@@ -23,5 +23,9 @@ include(
     ":droidshield-native",
     ":droidshield-engine",
     ":droidshield-sdk",
-    ":sample-app",
 )
+
+// :sample-app is intentionally absent. It is a standalone Gradle build
+// (sample-app/settings.gradle.kts) that consumes the published JitPack
+// artifacts instead of project dependencies, so it verifies the real
+// integration path. Build it with: cd sample-app && ../gradlew assembleDebug

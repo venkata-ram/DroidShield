@@ -92,6 +92,17 @@ implementation("dev.droidshield:droidshield-sdk:0.1.0")
 `publishAllToMavenLocal` covers the five library modules *and* `droidshield-gradle-plugin`,
 which is a separate included build (DECISIONS.md D027) and would otherwise be skipped.
 
+## A worked example
+
+Everything above is implemented in [`sample-app/`](sample-app), which is its own
+Gradle build resolving DroidShield from JitPack rather than from project
+dependencies. Its `settings.gradle.kts` and `build.gradle.kts` are the two
+snippets above, verbatim and known to work:
+
+```bash
+cd sample-app && ../gradlew assembleDebug
+```
+
 ---
 
 ## Usage by scenario
@@ -239,6 +250,6 @@ That's it. The engine picks it up, the polymorphic ordering includes it, telemet
 | `droidshield-engine` | `ThreatDetectionEngine` + `CheckOrder`. Knows nothing about specific checks. |
 | `droidshield-gradle-plugin` | Build-time polymorphic seed generation. |
 | `droidshield-sdk` | The public `.aar` — the `DroidShield` facade and Dagger graph. |
-| `sample-app` | Working end-to-end integration. |
+| `sample-app` | Working end-to-end integration. A standalone build consuming the JitPack artifacts — not part of the root build. |
 
 Dagger 2 (not Hilt) — a library shouldn't force `@HiltAndroidApp` onto its integrators.
