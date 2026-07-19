@@ -71,8 +71,14 @@ droidshield/
 ├── droidshield-engine/          # polymorphic injection engine, check registry
 ├── droidshield-gradle-plugin/   # AGP Instrumentation API + ASM visitors
 ├── droidshield-sdk/             # public runtime .aar — DroidShield facade, DI graph
-└── sample-app/                  # demo/integration-test app
+└── sample-app/                  # demo app — standalone build, consumes JitPack artifacts
 ```
+
+`sample-app` is not in the root build's `include(...)` list: it is its own
+Gradle build that depends on the *published* `droidshield-sdk`, so it
+exercises the real integration path rather than a project dependency
+(DECISIONS.md D032). `droidshield-gradle-plugin` is likewise a separate
+included build (D027).
 
 ### droidshield-domain
 Pure Kotlin module. Contains:

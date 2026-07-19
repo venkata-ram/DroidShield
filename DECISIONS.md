@@ -940,3 +940,54 @@ checks correctly fired true (`emulator.build_fingerprint`,
 `emulator.build_product_board`, `emulator.network_interface`) since
 this genuinely is an AVD — the first true runtime confirmation of the
 check logic, not just a build-time compile check.
+
+## D032 — `sample-app` is a standalone build consuming published JitPack artifacts, not a subproject on `project(":droidshield-sdk")`
+
+**Date:** 2026-07-19
+**Status:** Decided
+
+**Decision:** Removed `:sample-app` from the root `settings.gradle.kts`
+`include(...)` list and gave it its own `settings.gradle.kts`,
+`build.gradle.kts` and `gradle.properties`. It now resolves
+`com.github.venkata-ram.DroidShield:droidshield-sdk:0.1.0` and the
+`dev.droidshield` plugin from JitPack. Built with
+`cd sample-app && ../gradlew assembleDebug`. No source changes to
+`SampleApplication` or `MainActivity` were needed.
+
+**Reasoning:** As a subproject on `project(":droidshield-sdk")`,
+`sample-app` proved the *code* worked but never the thing an integrator
+actually does. Project dependencies bypass POM generation entirely, and
+the `includeBuild` in `pluginManagement` (D027) substituted the plugin
+locally, so the whole publishing path — transitive POM correctness, the
+packaged `.so`s inside the AAR, and the plugin-marker coordinate — was
+untested by any build in the repo. That path is also the one most likely
+to break silently, because JitPack rewrites the group ID to
+`com.github.<user>.<repo>`, which violates the convention that a plugin
+marker lives at a group ID equal to the plugin ID. The
+`resolutionStrategy.eachPlugin` workaround for this existed only as a
+README snippet nobody executed; it is now the sample's real
+`settings.gradle.kts`, so a documentation drift or a broken release
+fails a build instead of reaching an integrator.
+
+Versions in the sample are hardcoded rather than read from
+`gradle/libs.versions.toml`, since a standalone build has no access to
+the root catalog — and shouldn't, because an integrator copying the file
+wouldn't have it either.
+
+**Trade-offs accepted:** (1) The sample is pinned to a published release,
+so it lags the working tree by design and cannot exercise uncommitted SDK
+changes; `publishAllToMavenLocal` plus `mavenLocal()` is the documented
+route for that (recorded in `sample-app/OVERVIEW.md`). (2) A root-level
+`./gradlew build` no longer compiles the sample, so it needs its own step
+once CI exists. Both were preferred over the status quo, where the sample
+compiled reliably while telling us nothing about whether a release was
+consumable.
+
+**Verified (2026-07-19):** `cd sample-app && ../gradlew assembleDebug` →
+BUILD SUCCESSFUL, 36 tasks, resolving 0.1.0 from JitPack with no local
+substitution. `compileDebugKotlin` succeeding is itself proof the
+published Gradle plugin resolved through the `resolutionStrategy` mapping
+and generated `DroidShieldBuildSeed`, since `SampleApplication` imports it.
+The output APK contains `lib/{arm64-v8a,armeabi-v7a,x86_64}/libdroidshield.so`,
+confirming the native artifacts survive the publish → JitPack → consume
+round trip. Root `./gradlew assemble` still passes without the module.

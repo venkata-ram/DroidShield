@@ -2,7 +2,7 @@
 
 Runtime application self-protection (RASP) for Android, as a plain `.aar` you drop into your app.
 
-DroidShield answers one question at runtime: **is this app running in an environment I should trust?** It runs 41 checks across five threat categories — root, debugger, hooking frameworks, emulator, and tamper/repackaging — and hands you the results. What you do with them is entirely your call.
+DroidShield answers one question at runtime: **is this app running in an environment I should trust?** It runs 40 checks across five threat categories — root, debugger, hooking frameworks, emulator, and tamper/repackaging — and hands you the results. What you do with them is entirely your call.
 
 ## Why
 
@@ -19,7 +19,7 @@ implementation("com.github.venkata-ram.DroidShield:droidshield-sdk:0.1.0")
 
 ```kotlin
 val shield = DroidShield.init(context)
-val results = shield.runChecksSuspending()   // 41 checks, on Dispatchers.IO
+val results = shield.runChecksSuspending()   // 40 checks, on Dispatchers.IO
 ```
 
 Each check returns a `CheckResult`:
