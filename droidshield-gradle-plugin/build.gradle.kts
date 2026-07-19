@@ -13,7 +13,21 @@ plugins {
     `maven-publish`
 }
 
-group = "dev.droidshield"
+// Deliberately NOT "dev.droidshield" like the library modules, and not left to
+// JitPack's group rewriting either (DECISIONS.md D033).
+//
+// Gradle resolves `plugins { id("X") }` by looking for a marker artifact at
+// groupId == X. JitPack rewrites every published group to
+// com.github.<user>.<repo>, so a plugin ID of "dev.droidshield" produces a
+// marker Gradle can never find, and consumers need a resolutionStrategy block
+// to bridge it. Naming the group *and* the plugin ID after the coordinate
+// JitPack actually serves makes the marker land where Gradle looks, so
+// consuming this plugin is plain `plugins { id(...) }` with no workaround.
+//
+// Setting it explicitly rather than relying on the rewrite means local and
+// JitPack publications produce identical coordinates, so what is verified
+// against mavenLocal is what integrators get.
+group = "com.github.venkata-ram.DroidShield"
 
 // This is a standalone included build (D027), so it does not inherit the root
 // project's gradle.properties. Reading the parent file directly keeps the
@@ -47,7 +61,10 @@ dependencies {
 gradlePlugin {
     plugins {
         create("droidshield") {
-            id = "dev.droidshield"
+            // Must equal `group` above — see the comment there. The generated
+            // Kotlin still lands in the dev.droidshield package; only the
+            // Maven/plugin coordinate changed.
+            id = "com.github.venkata-ram.DroidShield"
             implementationClass = "dev.droidshield.gradleplugin.DroidShieldPlugin"
         }
     }

@@ -991,3 +991,58 @@ and generated `DroidShieldBuildSeed`, since `SampleApplication` imports it.
 The output APK contains `lib/{arm64-v8a,armeabi-v7a,x86_64}/libdroidshield.so`,
 confirming the native artifacts survive the publish → JitPack → consume
 round trip. Root `./gradlew assemble` still passes without the module.
+
+## D033 — Gradle plugin ID and group renamed to `com.github.venkata-ram.DroidShield` so consumers need no `resolutionStrategy`
+
+**Date:** 2026-07-19
+**Status:** Decided
+
+**Decision:** The plugin ID changed from `dev.droidshield` to
+`com.github.venkata-ram.DroidShield`, and `droidshield-gradle-plugin`'s
+`group` was pinned to the same string rather than left to JitPack's
+rewriting. Consumers now apply it with a plain
+`plugins { id("com.github.venkata-ram.DroidShield") version "0.2.0" }` and
+the `resolutionStrategy`/`eachPlugin` block is deleted from
+`sample-app/settings.gradle.kts` and INTEGRATION.md. Version bumped to
+0.2.0. The five library modules keep `group = "dev.droidshield"`, and the
+Kotlin package namespace is unchanged everywhere — this is a coordinate
+change only.
+
+**Reasoning:** Gradle resolves `plugins { id("X") }` through a marker
+artifact that must live at `groupId == X`. JitPack rewrites every group to
+`com.github.<user>.<repo>`, so a `dev.droidshield` ID published via JitPack
+produces a marker at a coordinate Gradle never queries. The previous
+workaround made every integrator paste an `eachPlugin` block — unusual
+enough that it reads as a red flag on an unfamiliar security library, and
+it is documentation that silently rots because nothing enforces it.
+
+Naming the plugin after the coordinate JitPack actually serves removes the
+mismatch at its source instead of bridging it. The obvious objection — that
+this leaks a GitHub username into consumers' build files — carries no
+weight here: consumers already type
+`com.github.venkata-ram.DroidShield:droidshield-sdk` for the library, so the
+plugin ID exposes nothing new and now matches it.
+
+`group` is set explicitly rather than relying on the rewrite so that
+mavenLocal and JitPack publications carry identical coordinates; otherwise
+local verification would exercise a different path than integrators get.
+
+**Trade-offs accepted:** (1) A breaking change for anyone on 0.1.0, hence
+the minor bump; 0.1.0 stays on JitPack and cannot be republished, since
+JitPack builds are immutable per tag. (2) The plugin ID is tied to the
+GitHub owner/repo, so renaming or transferring the repo breaks it. (3) It
+diverges from the `dev.droidshield` reverse-domain convention, and moving
+to Maven Central later (D019 — feasible today under an `io.github.…`
+namespace without owning `droidshield.dev`) would mean changing the ID
+again. Accepted because a rename is cheap relative to every integrator
+carrying a workaround in the meantime.
+
+**Verified locally (2026-07-19):** Gradle accepts an ID containing both a
+hyphen and uppercase characters — checked first with a throwaway plugin,
+since the whole approach hinges on it. Then `publishAllToMavenLocal`
+produced the marker at
+`com/github/venkata-ram/DroidShield/com.github.venkata-ram.DroidShield.gradle.plugin/0.2.0`,
+and a copy of `sample-app` pointed at mavenLocal (standing in for JitPack)
+built successfully with no `resolutionStrategy`. `compileDebugKotlin`
+passing proves the plugin resolved by ID and generated `DroidShieldBuildSeed`.
+Not yet verified against JitPack itself — that needs tag 0.2.0 pushed.

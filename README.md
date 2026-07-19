@@ -30,7 +30,7 @@ Then depend on the SDK — `droidshield-sdk` pulls in the domain, check, native 
 ```kotlin
 // app/build.gradle.kts
 dependencies {
-    implementation("com.github.venkata-ram.DroidShield:droidshield-sdk:0.1.0")
+    implementation("com.github.venkata-ram.DroidShield:droidshield-sdk:0.2.0")
 }
 ```
 
@@ -51,9 +51,16 @@ data class CheckResult(
 )
 ```
 
-That's the whole runtime setup. Polymorphic builds additionally need the `dev.droidshield` Gradle plugin, which takes a `resolutionStrategy` block to work around JitPack's group-ID rewriting — see **[INTEGRATION.md](INTEGRATION.md)**.
+That's the whole runtime setup — no `resolutionStrategy`, no extra plumbing. Polymorphic builds additionally want the Gradle plugin, which installs the same way:
 
-> Group IDs are `com.github.venkata-ram.DroidShield`, not `dev.droidshield`. The artifacts are *built* with the `dev.droidshield` group, but JitPack rewrites it on publish. The `dev.droidshield` coordinates only apply to local builds (`./gradlew publishAllToMavenLocal`).
+```kotlin
+// app/build.gradle.kts
+plugins {
+    id("com.github.venkata-ram.DroidShield") version "0.2.0"
+}
+```
+
+See **[INTEGRATION.md](INTEGRATION.md)** for what the plugin does and the other six integration scenarios.
 
 ## What's different about it
 

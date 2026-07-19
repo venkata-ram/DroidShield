@@ -4,6 +4,10 @@
 // off JitPack, not `project(":droidshield-sdk")` — so this file doubles as an
 // executable version of the setup in INTEGRATION.md. If JitPack publishing
 // breaks, this build stops compiling, which is the point.
+//
+// Note there is no `resolutionStrategy` here: the Gradle plugin's ID matches
+// the group JitPack publishes it under (DECISIONS.md D033), so adding the
+// JitPack repository is the entire setup.
 
 pluginManagement {
     repositories {
@@ -11,17 +15,6 @@ pluginManagement {
         mavenCentral()
         gradlePluginPortal()
         maven("https://jitpack.io")
-    }
-    resolutionStrategy {
-        eachPlugin {
-            // A plugin marker must live at a group ID equal to the plugin ID,
-            // but JitPack rewrites every group to com.github.<user>.<repo>, so
-            // the marker is never published where Gradle looks for it. This
-            // maps the plugin ID onto the coordinate JitPack actually serves.
-            if (requested.id.id == "dev.droidshield") {
-                useModule("com.github.venkata-ram.DroidShield:droidshield-gradle-plugin:${requested.version}")
-            }
-        }
     }
 }
 

@@ -23,11 +23,11 @@ ownership of `droidshield.dev`. It's consumed via JitPack, which builds straight
 Git tag. JitPack rewrites the group ID to `com.github.<user>.<repo>`, so the coordinates
 below differ from the `dev.droidshield` group the artifacts are built with.
 
-### 1. Add the repository and map the plugin ID
+### 1. Add the repository
 
-The Gradle plugin needs an explicit mapping: a plugin marker has to live at a group ID
-equal to the plugin ID, and JitPack's group rewriting breaks that convention. The
-`resolutionStrategy` below is what bridges it.
+Adding JitPack is the entire setup — for the library *and* the Gradle plugin. There is
+no `resolutionStrategy` block: the plugin's ID is the same coordinate JitPack publishes
+it under, so Gradle finds the plugin marker where it already looks (DECISIONS.md D033).
 
 ```kotlin
 // settings.gradle.kts
@@ -37,13 +37,6 @@ pluginManagement {
         mavenCentral()
         gradlePluginPortal()
         maven("https://jitpack.io")
-    }
-    resolutionStrategy {
-        eachPlugin {
-            if (requested.id.id == "dev.droidshield") {
-                useModule("com.github.venkata-ram.DroidShield:droidshield-gradle-plugin:${requested.version}")
-            }
-        }
     }
 }
 
@@ -58,16 +51,20 @@ dependencyResolutionManagement {
 
 ### 2. Apply the plugin and depend on the SDK
 
+The plugin ID and the dependency coordinate share the same
+`com.github.venkata-ram.DroidShield` prefix — that is the point, not a coincidence.
+
 ```kotlin
 // app/build.gradle.kts
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
-    id("dev.droidshield") version "0.1.0"   // generates the per-build polymorphic seed
+    // Generates the per-build polymorphic seed. Optional — see Scenario 4.
+    id("com.github.venkata-ram.DroidShield") version "0.2.0"
 }
 
 dependencies {
-    implementation("com.github.venkata-ram.DroidShield:droidshield-sdk:0.1.0")
+    implementation("com.github.venkata-ram.DroidShield:droidshield-sdk:0.2.0")
 }
 ```
 
@@ -77,17 +74,23 @@ transitively — you only ever declare the one coordinate.
 ## Consuming a local build
 
 To integrate against uncommitted changes, publish to your local Maven repository and
-point the consuming project at `mavenLocal()`. Coordinates are the real `dev.droidshield`
-group in this case, and the plugin marker works normally, so no `resolutionStrategy` is
-needed:
+add `mavenLocal()` to both repository blocks above:
 
 ```bash
 ./gradlew publishAllToMavenLocal
 ```
 
+The **libraries** are published locally under their real `dev.droidshield` group, which
+JitPack rewrites to `com.github.…` only on publish — so the coordinate differs from the
+JitPack one:
+
 ```kotlin
-implementation("dev.droidshield:droidshield-sdk:0.1.0")
+implementation("dev.droidshield:droidshield-sdk:0.2.0")
 ```
+
+The **plugin** is not subject to that: its group is pinned to
+`com.github.venkata-ram.DroidShield` in the build script precisely so local and JitPack
+publications are identical, and the plugin ID stays the same either way.
 
 `publishAllToMavenLocal` covers the five library modules *and* `droidshield-gradle-plugin`,
 which is a separate included build (DECISIONS.md D027) and would otherwise be skipped.
