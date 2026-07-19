@@ -62,7 +62,7 @@ The plugin ID and the dependency coordinate share the same
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
-    // Generates the version-derived ordering seed. Optional — see Scenario 5.
+    // Generates the ordering seed the SDK auto-applies. Optional — see Scenario 5.
     id("com.github.venkata-ram.DroidShield") version "0.4.0"
 }
 
@@ -222,23 +222,39 @@ DroidShield.init(
 
 ### Scenario 5 — Turn on release-seeded check ordering
 
-Apply the `com.github.venkata-ram.DroidShield` plugin, then feed the generated seed in:
+Apply the `com.github.venkata-ram.DroidShield` plugin. That's all that's required — the
+SDK picks up the generated seed automatically, so seeded ordering is on with no config
+wiring:
 
 ```kotlin
-import dev.droidshield.generated.DroidShieldBuildSeed
-
-DroidShield.init(
-    context,
-    config = DroidShieldConfig(polymorphicSeed = DroidShieldBuildSeed.SEED)
-)
+DroidShield.init(context)
 ```
 
-The seed is derived from your project path and version, so it's stable across incremental builds (no spurious recompiles) and changes when you bump the version for a release. Pin it in CI with `-PdroidshieldSeed=12345` when you need to reproduce a specific build's ordering.
+Set `DroidShieldConfig(polymorphicSeed = ...)` only if you want to override the
+plugin-generated seed with a specific value.
+
+**Make the seed unpredictable.** By default the seed is derived from your project path and
+version, which are both visible in a shipped APK — so anyone who inspects one build can
+recompute the ordering of every version. To make the ordering a real moat, provide a
+build-time secret so the seed can't be derived from the public artifact:
+
+```bash
+# in CI, from a secret store — never commit this
+./gradlew assembleRelease -PdroidshieldSeedSecret="$DROIDSHIELD_SEED_SECRET"
+# or set the DROIDSHIELD_SEED_SECRET environment variable
+```
+
+The seed stays stable within a version (incremental builds still cache; no spurious
+recompiles) and changes when you bump the version. Without a secret the build logs a
+warning that the ordering is publicly recomputable. Pin the seed exactly with
+`-PdroidshieldSeed=12345` when CI needs to reproduce a specific build's ordering.
 
 The seed changes execution order only. Guarded-method instrumentation is the separate,
 explicitly annotated feature below; neither feature makes a release immune to bypasses.
 
-Leave `polymorphicSeed` null and checks run in deterministic declaration order — which is what you want in tests.
+Set `polymorphicSeed` explicitly to `null`-equivalent behavior — i.e. don't apply the
+plugin and leave it unset — and checks run in deterministic declaration order, which is
+what you want in tests.
 
 ### Scenario 6 — Guard a security-sensitive method
 

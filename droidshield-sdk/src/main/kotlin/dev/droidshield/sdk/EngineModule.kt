@@ -18,7 +18,12 @@ object EngineModule {
         telemetrySink: TelemetrySink,
         config: DroidShieldConfig,
     ): ThreatDetectionEngine {
-        val order = config.polymorphicSeed?.let { CheckOrder.Seeded(it) } ?: CheckOrder.Unseeded
+        // An explicit config value wins; otherwise fall back to the seed the
+        // Gradle plugin generated into the host app, so applying the plugin
+        // gives release-seeded ordering with no config wiring. Null from both
+        // means unseeded/deterministic ordering. See DECISIONS.md D038.
+        val seed = config.polymorphicSeed ?: GeneratedBuildSeed.value
+        val order = seed?.let { CheckOrder.Seeded(it) } ?: CheckOrder.Unseeded
         return ThreatDetectionEngine(checks, reporter, telemetrySink, order)
     }
 }

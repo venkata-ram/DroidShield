@@ -1153,3 +1153,47 @@ unbypassable enforcement boundary. Operation identifiers are diagnostics, not se
 The most recently initialized DroidShield instance backs injected triggers, matching the
 normal single-instance application integration; unusual multi-instance tests should not
 depend on the global guarded-method bridge.
+
+## D038 — Unpredictable seed provenance and auto-wired polymorphic ordering
+
+**Date:** 2026-07-19
+**Status:** Decided
+
+**Supersedes:** The seed-derivation half of D026/D036 — the seed is no longer a
+`Random(identity.hashCode())` value, and the integrator no longer hand-wires it into
+`DroidShieldConfig`. The source-codegen mechanism and release-seeded-ordering framing of
+D026/D036 are unchanged.
+
+**Decision:** Two changes make the existing release-seeded ordering a moat rather than a
+cosmetic reordering.
+
+1. **Unpredictable seed provenance.** `DroidShieldPlugin.resolveSeed` resolves the build
+   seed in precedence order: (a) an explicit `-PdroidshieldSeed=<n>` pin; (b) a build-seed
+   *secret* from `-PdroidshieldSeedSecret=<s>` or the `DROIDSHIELD_SEED_SECRET` env var,
+   folded with the build identity (`<project path>:<version>`) through SHA-256; (c) a
+   fallback derived from the build identity alone, emitted with a `warn`-level log that the
+   ordering is publicly recomputable. All derivations fold through SHA-256 (`seedFrom`),
+   replacing `String.hashCode()`, whose 32-bit output is trivially invertible.
+
+2. **Auto-wired seed.** `EngineModule` reads `config.polymorphicSeed ?: GeneratedBuildSeed.value`.
+   `GeneratedBuildSeed` reflectively reads `dev.droidshield.generated.DroidShieldBuildSeed.SEED`
+   (compiled into the host app, absent from the SDK modules) once and caches it, so applying
+   the Gradle plugin yields seeded ordering with no config wiring. An explicit
+   `polymorphicSeed` still wins; both absent means unseeded/deterministic ordering.
+
+**Reasoning:** The prior seed was `Random("${path}:${version}".hashCode()).nextLong()`. Both
+inputs are printed on the shipped APK and `String.hashCode()` is a fixed, documented
+algorithm, so an attacker who reverse-engineers one build can recompute the check ordering
+and subset of every version — the variance gave the attacker zero uncertainty. Deriving the
+seed from a CI-held secret keeps it stable within a version (incremental builds still cache;
+reproducibility via the explicit pin is preserved) while making it underivable from the
+public artifact. Auto-wiring removes the failure mode where an integrator applies the plugin
+but forgets to pass `DroidShieldBuildSeed.SEED` into the config and silently gets
+deterministic ordering.
+
+**Limits accepted:** This is Phase 1 of the polymorphism moat. It removes seed
+*predictability* but the variance is still only ordering/subset selection over identical
+check implementations, and the seed is build-time (per shipped build), not per session.
+Semantic per-check variance, server-issued per-session challenge/nonce ordering, and ASM
+invocation-site variance remain future phases. The secret must be held by CI, not committed;
+the warning fires precisely so a missing secret is visible rather than silent.

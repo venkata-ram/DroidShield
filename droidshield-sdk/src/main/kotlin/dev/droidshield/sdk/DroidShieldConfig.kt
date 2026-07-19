@@ -26,9 +26,13 @@ data class DroidShieldConfig(
     val expectedManifestAllowBackup: Boolean = true,
     val expectedInstallerPackage: String = "com.android.vending",
     /**
-     * Optional seed for release-specific check ordering. Null means
-     * unseeded/deterministic ordering. See DECISIONS.md D026 for how the
-     * Gradle plugin generates it.
+     * Optional explicit override for release-specific check ordering. When
+     * left null, the SDK falls back to the seed the Gradle plugin generated
+     * into the host app, so applying the plugin is enough to get seeded
+     * ordering — you only set this to force a specific seed. Null here *and*
+     * no plugin-generated seed means unseeded/deterministic ordering. See
+     * DECISIONS.md D026 for how the Gradle plugin generates it and D037 for
+     * the auto-wiring and unpredictable-seed provenance.
      */
     val polymorphicSeed: Long? = null,
     /** Minimum delay between check runs triggered by [DroidShieldGuarded] methods. */

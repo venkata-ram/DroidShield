@@ -8,7 +8,7 @@ import com.android.build.api.variant.ApplicationAndroidComponentsExtension
 import org.gradle.api.Plugin
 import org.gradle.api.Project
 import org.jetbrains.kotlin.gradle.dsl.KotlinAndroidProjectExtension
-import kotlin.random.Random
+import java.security.MessageDigest
 
 /**
  * Generates one Kotlin source file exposing a version-derived
@@ -132,14 +132,58 @@ class DroidShieldPlugin : Plugin<Project> {
      * unreproducible and configuration-cache-hostile.
      *
      * Polymorphism only needs the seed to differ between *shipped builds*,
-     * not between compiles of the same source. Deriving it from the
-     * project's identity and version gives a value that is stable within a
-     * version (so incremental builds cache correctly) and changes when the
-     * version is bumped for a release. `-PdroidshieldSeed=<n>` still pins
-     * it explicitly, which is what CI should use when it needs a specific
-     * build's ordering reproduced.
+     * not between compiles of the same source, so the seed must stay stable
+     * within a version (incremental builds cache correctly) while being
+     * unpredictable to an attacker who inspects a shipped build. The three
+     * sources, in precedence order (see DECISIONS.md D038):
+     *
+     *  1. `-PdroidshieldSeed=<n>` — an explicit pin. CI uses this when it
+     *     needs a specific build's ordering reproduced exactly.
+     *  2. A build-seed *secret* (`-PdroidshieldSeedSecret=<s>` or the
+     *     `DROIDSHIELD_SEED_SECRET` env var) folded together with the build
+     *     identity through SHA-256. Stable per version, but not derivable
+     *     without the secret — this is what makes the ordering a real moat
+     *     rather than a value anyone can recompute from the public APK.
+     *  3. A fallback derived from the public build identity alone, emitted
+     *     with a warning, because an attacker who reverse-engineers one
+     *     build can recompute the ordering of every version from it.
+     *
+     * Even the fallback goes through SHA-256 rather than `String.hashCode()`,
+     * whose 32-bit output is trivially invertible; the warning, not the
+     * hash, is what tells the integrator the ordering is still predictable.
      */
-    private fun resolveSeed(target: Project): Long =
-        (target.findProperty("droidshieldSeed") as? String)?.toLongOrNull()
-            ?: Random("${target.path}:${target.version}".hashCode()).nextLong()
+    private fun resolveSeed(target: Project): Long {
+        (target.findProperty("droidshieldSeed") as? String)?.toLongOrNull()?.let { return it }
+
+        val secret = (target.findProperty("droidshieldSeedSecret") as? String)?.takeIf { it.isNotBlank() }
+            ?: System.getenv("DROIDSHIELD_SEED_SECRET")?.takeIf { it.isNotBlank() }
+
+        val identity = "${target.path}:${target.version}"
+        if (secret == null) {
+            target.logger.warn(
+                "DroidShield: no build-seed secret configured, so the polymorphic check-ordering " +
+                    "seed is derived from public build identity ('$identity') and can be recomputed by " +
+                    "anyone who inspects a shipped build. Set -PdroidshieldSeedSecret=<secret> or the " +
+                    "DROIDSHIELD_SEED_SECRET environment variable in CI so the ordering can't be " +
+                    "precomputed. See DECISIONS.md D038.",
+            )
+            return seedFrom(identity)
+        }
+        return seedFrom("$secret $identity")
+    }
+
+    /**
+     * Folds [material] to a `Long` via SHA-256. Deterministic for a given
+     * input (so builds of the same source cache), but — unlike
+     * `String.hashCode()` — not reversible, so a secret-derived seed can't
+     * be worked backwards from the emitted value.
+     */
+    internal fun seedFrom(material: String): Long {
+        val digest = MessageDigest.getInstance("SHA-256").digest(material.toByteArray(Charsets.UTF_8))
+        var seed = 0L
+        for (i in 0 until Long.SIZE_BYTES) {
+            seed = (seed shl 8) or (digest[i].toLong() and 0xff)
+        }
+        return seed
+    }
 }

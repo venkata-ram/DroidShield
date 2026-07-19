@@ -86,7 +86,7 @@ See **[INTEGRATION.md](docs/INTEGRATION.md)** for what the plugin does and the o
 
 - **Checks at the operations that matter.** Annotate login, payment, token, or other sensitive methods with `@DroidShieldGuarded`; the Gradle plugin injects a non-blocking, rate-limited threat-check trigger into each method's bytecode.
 - **Release hardening as a build invariant.** Release builds fail fast if they are debuggable or ship without R8 minification and resource shrinking. Teams can explicitly downgrade the gate when migration requires it.
-- **Release-seeded check ordering.** The plugin also derives a reproducible seed from the project and version; the engine uses it to shuffle check execution between configured releases.
+- **Release-seeded check ordering.** The plugin derives a reproducible seed and the SDK picks it up automatically to shuffle check execution between releases. Feed a build-time secret (`-PdroidshieldSeedSecret` / `DROIDSHIELD_SEED_SECRET`) and the ordering can't be recomputed from the shipped APK; without one, the build warns that it can.
 - **Native checks where they matter.** Anti-debug (`ptrace` self-attach), `/proc/self/maps` scanning, trampoline-hook detection, and native checksumming live in C++, not Kotlin. This gives attackers an additional native analysis surface; it does not make the checks unpatchable.
 - **No DroidShield-hosted backend.** No dashboard, hosted service, or default phone-home behavior. `ThreatReporter` is a one-method interface you implement; your threat signals go where *you* send them.
 - **No bundled analytics vendor.** Telemetry defaults to a no-op sink. The SDK does use documented runtime libraries such as Dagger, Kotlin coroutines, and AndroidX.

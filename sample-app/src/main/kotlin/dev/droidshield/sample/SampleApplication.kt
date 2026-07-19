@@ -4,7 +4,6 @@ import android.app.Application
 import android.util.Log
 import dev.droidshield.generated.DroidShieldBuildSeed
 import dev.droidshield.sdk.DroidShield
-import dev.droidshield.sdk.DroidShieldConfig
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
@@ -12,8 +11,9 @@ import kotlinx.coroutines.launch
 /**
  * Demonstrates the full integration path: applying `dev.droidshield` in
  * `build.gradle.kts` generates [DroidShieldBuildSeed] at build time
- * (DECISIONS.md D026), which this app feeds into [DroidShieldConfig] so
- * the engine's check ordering varies build-to-build.
+ * (DECISIONS.md D026). The SDK picks that seed up automatically
+ * (DECISIONS.md D038), so this app does not wire it into the config — it
+ * only reads it here to log the value in use.
  *
  * Checks run via [DroidShield.runChecksSuspending] inside [applicationScope]
  * rather than the blocking [DroidShield.runChecks] — several checks do
@@ -31,10 +31,7 @@ class SampleApplication : Application() {
     override fun onCreate() {
         super.onCreate()
 
-        val droidShield = DroidShield.init(
-            context = this,
-            config = DroidShieldConfig(polymorphicSeed = DroidShieldBuildSeed.SEED),
-        )
+        val droidShield = DroidShield.init(context = this)
 
         applicationScope.launch {
             val results = droidShield.runChecksSuspending()
