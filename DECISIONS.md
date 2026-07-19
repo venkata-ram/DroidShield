@@ -1075,3 +1075,44 @@ boundary.
 
 **Verified (2026-07-19):** `:droidshield-domain:test`,
 `:droidshield-sdk:testDebugUnitTest`, and `:droidshield-sdk:assembleRelease` all pass.
+
+## D035 — Position DroidShield as runtime threat detection, not a complete RASP product
+
+**Date:** 2026-07-19
+**Status:** Decided
+
+**Decision:** Public documentation describes DroidShield as an open-source Android
+runtime threat-detection SDK and a foundation for RASP architectures and
+backend-driven enforcement. It does not claim that DroidShield alone is a complete
+Runtime Application Self-Protection product.
+
+**Reasoning:** DroidShield detects runtime threats and produces evidence, but it does
+not bundle automatic prevention, a hosted policy backend, incident orchestration, or a
+management plane. Calling the current SDK a complete RASP product would imply controls
+that are deliberately outside its scope under D001 and D004. The narrower positioning
+is accurate without underselling the role DroidShield can play inside a larger RASP
+architecture.
+
+References to RASP remain appropriate when describing that broader architecture or
+contrasting DroidShield's detection layer with full commercial products. They must not
+imply that installing the SDK alone creates an end-to-end protection boundary.
+
+## D036 — Describe the Gradle feature as release-seeded ordering
+
+**Date:** 2026-07-19
+**Status:** Decided
+
+**Supersedes:** The "seed varies every build" wording in D026. D026 remains the
+record of why source generation was chosen instead of ASM instrumentation.
+
+**Decision:** Public documentation describes the implemented feature as reproducible,
+version-derived check ordering. It does not claim host-app bytecode injection,
+generated check implementations, a different check subset in each release, or a
+guaranteed need for attackers to rewrite bypasses.
+
+**Reasoning:** The Gradle plugin generates a seed from the consumer project path and
+version, and the SDK uses that seed to shuffle runtime execution order. The public SDK
+does not expose `CheckOrder`'s subset fraction, and the plugin does not rewrite host
+classes. Stable seeds also preserve incremental builds and reproducibility. Naming the
+actual mechanism makes its benefit and limitations clear without presenting ordering
+variation as a complete anti-bypass boundary.

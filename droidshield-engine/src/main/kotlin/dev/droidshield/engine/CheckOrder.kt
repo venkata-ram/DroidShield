@@ -4,9 +4,9 @@ import dev.droidshield.domain.ThreatCheck
 import kotlin.random.Random
 
 /**
- * The polymorphic-injection mechanism (ARCHITECTURE.md §1/§8): each build
- * gets a different ordering/subset of checks so a bypass tuned against one
- * build's check sequence doesn't trivially transfer to the next.
+ * Applies deterministic or seeded runtime ordering. The SDK uses the seeded
+ * form to vary execution order between configured releases; this does not
+ * inject code into the host app or prevent individual checks from being bypassed.
  *
  * This governs *execution order and subset selection at runtime*, given
  * whatever seed the build produced. See DECISIONS.md D026 for why build-time

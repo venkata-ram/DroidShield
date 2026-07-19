@@ -1,6 +1,9 @@
 # DroidShield — Integration Guide
 
-Full setup and usage details. For a short overview, see [README.md](README.md).
+Full setup and usage details. DroidShield supplies runtime threat signals and backend
+evidence; the host app and its backend own policy and enforcement. It is a foundation
+for a broader RASP architecture, not a complete RASP product. For a short overview,
+see [README.md](README.md).
 
 ## Contents
 
@@ -59,7 +62,7 @@ The plugin ID and the dependency coordinate share the same
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
-    // Generates the per-build polymorphic seed. Optional — see Scenario 4.
+    // Generates the version-derived ordering seed. Optional — see Scenario 5.
     id("com.github.venkata-ram.DroidShield") version "0.3.1"
 }
 
@@ -217,7 +220,7 @@ DroidShield.init(
 
 > `expectedManifestAllowBackup` defaults to `true` because that's the *platform* default when the attribute is absent. If your manifest sets `android:allowBackup="false"`, set this to `false` too — otherwise every clean run reports a tamper.
 
-### Scenario 5 — Turn on polymorphic builds
+### Scenario 5 — Turn on release-seeded check ordering
 
 Apply the `dev.droidshield` plugin, then feed the generated seed in:
 
@@ -231,6 +234,9 @@ DroidShield.init(
 ```
 
 The seed is derived from your project path and version, so it's stable across incremental builds (no spurious recompiles) and changes when you bump the version for a release. Pin it in CI with `-PdroidshieldSeed=12345` when you need to reproduce a specific build's ordering.
+
+This changes execution order only. It does not inject calls into host-app bytecode,
+generate different check implementations, or make a release immune to bypasses.
 
 Leave `polymorphicSeed` null and checks run in deterministic declaration order — which is what you want in tests.
 
@@ -286,7 +292,7 @@ Then one line in `RootChecksModule`:
 fun providesMyCheck(): ThreatCheck = MyCheck()
 ```
 
-That's it. The engine picks it up, the polymorphic ordering includes it, telemetry wraps it, and a thrown exception is caught and reported as `check_error` rather than crashing the run.
+That's it. The engine picks it up, seeded ordering includes it, telemetry wraps it, and a thrown exception is caught and reported as `check_error` rather than crashing the run.
 
 ---
 
@@ -298,7 +304,7 @@ That's it. The engine picks it up, the polymorphic ordering includes it, telemet
 | `droidshield-data-android` | 36 checks using Android APIs — `PackageManager`, `Build`, `/proc`. Most contributions land here. |
 | `droidshield-native` | C++ checks + JNI bridge → `libdroidshield.so`. |
 | `droidshield-engine` | `ThreatDetectionEngine` + `CheckOrder`. Knows nothing about specific checks. |
-| `droidshield-gradle-plugin` | Build-time polymorphic seed generation. |
+| `droidshield-gradle-plugin` | Version-derived ordering-seed generation. |
 | `droidshield-sdk` | The public `.aar` — the `DroidShield` facade and Dagger graph. |
 | `sample-app` | Working end-to-end integration. A standalone build consuming the JitPack artifacts — not part of the root build. |
 
