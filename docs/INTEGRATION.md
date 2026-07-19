@@ -262,6 +262,17 @@ seconds by default:
 DroidShieldConfig(guardedMethodMinIntervalMillis = 60_000L)
 ```
 
+Here, **coalesced** means that if another guarded method is entered while a
+guard-triggered check run is already in progress, the new trigger does not start a
+second check run; the in-progress run continues and the additional trigger is ignored.
+The **cooldown** is the minimum time after an accepted trigger before another guarded
+method can start a new check run. For example, with the default 30-second cooldown, a
+trigger at `00s` starts checks, triggers at `01s` and `05s` are ignored, and a trigger
+at or after `30s` may start the next run (provided no check run is still in progress).
+This limits repeated disk, process, and socket work when several guarded methods are
+called close together. Consequently, guarded annotations provide background monitoring;
+they are not a guaranteed per-invocation gate for the annotated operation.
+
 Calls before `DroidShield.init(...)` are ignored. Only methods in the Android application
 module are instrumented; dependency bytecode is never rewritten. Disable instrumentation
 when diagnosing a build with:
