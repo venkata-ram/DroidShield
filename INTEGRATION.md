@@ -60,11 +60,11 @@ plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
     // Generates the per-build polymorphic seed. Optional — see Scenario 4.
-    id("com.github.venkata-ram.DroidShield") version "0.3.0"
+    id("com.github.venkata-ram.DroidShield") version "0.3.1"
 }
 
 dependencies {
-    implementation("com.github.venkata-ram.DroidShield:droidshield-sdk:0.3.0")
+    implementation("com.github.venkata-ram.DroidShield:droidshield-sdk:0.3.1")
 }
 ```
 
@@ -85,7 +85,7 @@ JitPack rewrites to `com.github.…` only on publish — so the coordinate diffe
 JitPack one:
 
 ```kotlin
-implementation("dev.droidshield:droidshield-sdk:0.3.0")
+implementation("dev.droidshield:droidshield-sdk:0.3.1")
 ```
 
 The **plugin** is not subject to that: its group is pinned to
