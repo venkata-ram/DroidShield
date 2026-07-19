@@ -1,3 +1,7 @@
+// `java` alone would resolve to the JavaPluginExtension this script applies,
+// not the JDK package, so Properties has to be imported explicitly.
+import java.util.Properties
+
 // Build-time only: AGP Variant API + source codegen (see DECISIONS.md
 // D026). No dependency on droidshield-engine, droidshield-data-android, or
 // droidshield-native — it never needs to know about specific checks, and
@@ -6,10 +10,26 @@
 plugins {
     alias(libs.plugins.kotlin.jvm)
     `java-gradle-plugin`
+    `maven-publish`
+}
+
+group = "dev.droidshield"
+
+// This is a standalone included build (D027), so it does not inherit the root
+// project's gradle.properties. Reading the parent file directly keeps the
+// published version in exactly one place rather than drifting between two.
+version = Properties().run {
+    rootDir.resolve("../gradle.properties").inputStream().use { load(it) }
+    getProperty("droidshield.version")
+        ?: error("droidshield.version missing from the root gradle.properties")
 }
 
 kotlin {
     jvmToolchain(17)
+}
+
+java {
+    withSourcesJar()
 }
 
 dependencies {

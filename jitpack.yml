@@ -1,0 +1,12 @@
+# JitPack build config. JitPack runs the `install` commands and then collects
+# whatever landed in ~/.m2/repository, so the aggregate task in the root
+# build.gradle.kts is what makes the Gradle plugin (a separate included build)
+# get picked up alongside the five library modules.
+#
+# JDK 17 is not optional here: every module pins jvmToolchain(17) and AGP 8.7
+# refuses to run on anything lower.
+jdk:
+  - openjdk17
+
+install:
+  - ./gradlew publishAllToMavenLocal --no-daemon --stacktrace
