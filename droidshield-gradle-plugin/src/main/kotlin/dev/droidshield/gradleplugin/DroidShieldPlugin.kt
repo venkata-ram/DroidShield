@@ -7,8 +7,7 @@ import org.jetbrains.kotlin.gradle.dsl.KotlinAndroidProjectExtension
 import kotlin.random.Random
 
 /**
- * ARCHITECTURE.md §3 — build-time half of the polymorphic-injection
- * mechanism. Generates one Kotlin source file per build exposing a random
+ * Generates one Kotlin source file exposing a version-derived
  * (or pinned, via `-PdroidshieldSeed=<n>`) seed, wired into the host app's
  * (or library's) Kotlin compilation via the Kotlin Gradle Plugin's own
  * source-set API. See DECISIONS.md D026 for why this is source codegen

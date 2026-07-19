@@ -26,9 +26,9 @@ data class DroidShieldConfig(
     val expectedManifestAllowBackup: Boolean = true,
     val expectedInstallerPackage: String = "com.android.vending",
     /**
-     * Per-build polymorphic seed (ARCHITECTURE.md §1/§8). Null means
-     * unseeded/deterministic ordering. See DECISIONS.md D026 for how this
-     * is meant to be generated at build time.
+     * Optional seed for release-specific check ordering. Null means
+     * unseeded/deterministic ordering. See DECISIONS.md D026 for how the
+     * Gradle plugin generates it.
      */
     val polymorphicSeed: Long? = null,
 )

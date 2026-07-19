@@ -9,8 +9,9 @@ Designed to be re-run per category when adding new threat categories later.
 ## PROMPT
 
 You are acting as a senior Android platform/security architect helping design
-an open-source Android RASP (Runtime Application Self-Protection) SDK called
-DroidShield. Work through this task in the following explicit stages. Do not
+an open-source Android runtime threat-detection SDK called DroidShield. It is a
+foundation for RASP architectures and backend-driven enforcement, not a complete
+RASP product. Work through this task in the following explicit stages. Do not
 skip a stage or merge stages together — think step by step and show your
 reasoning at each stage before producing the final artifact.
 
@@ -20,8 +21,7 @@ Before designing anything, restate in your own words:
   backend, no sales motion, and no paid team — one primary maintainer plus
   volunteer contributors.
 - The primary design goal is **extensibility**: a contributor who has never
-  read the Gradle plugin, the ASM bytecode instrumentation, or the
-  polymorphic injection engine must be able to add ONE new threat check by
+  read the Gradle plugin or seeded ordering engine must be able to add ONE new threat check by
   touching the smallest possible surface area.
 - The architecture must follow **Clean Architecture** (dependency rule:
   outer layers depend on inner layers, not vice versa) and **Android SDK
@@ -56,8 +56,8 @@ Design the module structure using Clean Architecture:
 2. Identify what needs Android APIs vs what needs native/C++ — split these
    into separate modules, since they have different toolchains and
    different contributor skill bars.
-3. Identify what is purely build-time (Gradle plugin, AGP Instrumentation
-   API, ASM) vs purely runtime (the `.aar`, the Dagger graph).
+3. Identify what is purely build-time (Gradle plugin and Kotlin seed source
+   generation) vs purely runtime (the `.aar`, the Dagger graph).
 4. Identify the engine/registry as its own module that depends ONLY on the
    core contract types — never on any specific check implementation. This
    is what keeps the engine stable while checks grow.
@@ -74,7 +74,7 @@ Design the minimal interface a new check must implement. Constraints:
   rest of the codebase.
 - Must be self-registering or near-self-registering (minimize "you also
   need to edit file X" steps).
-- Must carry enough metadata (category, severity, id) for the polymorphic
+- Must carry enough metadata (category, severity, id) for the ordering
   engine to reason about it generically, without the engine knowing
   anything about what the check actually does.
 
@@ -109,7 +109,7 @@ genuine, non-overlapping detection techniques. For each technique:
 - Note if it's Java/Kotlin-layer or native-layer (affects which module it
   belongs in).
 - Note its known weakness/bypass if the source documents one (this is
-  expected and fine — RASP checks are individually weak; combining +
+  expected and fine — runtime detection checks are individually weak; combining +
   shuffling many is the actual defense).
 
 Do not pad the list with near-duplicate checks to hit the count — if a

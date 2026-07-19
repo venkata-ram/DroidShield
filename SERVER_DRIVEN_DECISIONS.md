@@ -4,7 +4,11 @@
 
 This guide explains how to take DroidShield's on-device results and let **your server** decide what happens next — instead of hardcoding "if rooted, block" into your app.
 
-DroidShield itself ships no backend. Everything below is a design you build on your side; DroidShield just gives you the raw signal.
+DroidShield itself ships no backend. It provides transport-neutral request and response models plus evidence collection; you supply the Retrofit endpoint, authentication, JSON converter, and server policy.
+
+This is the enforcement pattern DroidShield is designed to support, but the SDK remains
+the runtime detection and evidence layer within that architecture. It does not claim the
+prevention, orchestration, or management surface of a complete RASP product.
 
 ---
 
@@ -41,7 +45,7 @@ The client's only job is to be an honest witness. It gathers evidence and sends 
 │   Android app        │                    │   Your server        │
 │                      │                    │                      │
 │  DroidShield         │   1. evidence      │   Policy engine      │
-│  runs 41 checks  ────┼───────────────────>│   (rules you own)    │
+│  runs 40 checks  ────┼───────────────────>│   (rules you own)    │
 │                      │                    │          │           │
 │                      │   2. verdict       │          ▼           │
 │  Obeys the verdict <─┼────────────────────┼──  ALLOW / STEP_UP   │
@@ -55,31 +59,26 @@ Important: this is **not** a security boundary on its own. A tampered client can
 
 ## 3. Step one — collect the evidence
 
-DroidShield already returns everything you need. Don't send the raw `CheckResult` list, though — shape it into a small, stable payload.
+DroidShield can return a small, stable backend payload directly. It deliberately excludes raw `CheckResult.detail` strings, which may contain file paths or process names.
 
 ```kotlin
-val results = droidShield.runChecksSuspending()
-
-val evidence = DeviceEvidence(
-    // Only the checks that fired. A clean device sends an empty list.
-    triggered = results.filter { it.detected }.map {
-        TriggeredCheck(
-            checkId = it.checkId,          // "su_binary_path"
-            category = it.category.name,   // "ROOT"
-            severity = it.severity.name    // "HIGH"
-        )
-    },
-    // Context the server needs to interpret the above.
-    checksRun = results.size,              // did all 41 run, or only a subset?
-    appVersion = BuildConfig.VERSION_NAME,
-    sdkVersion = Build.VERSION.SDK_INT,
-    collectedAtMillis = System.currentTimeMillis()
+val evidence = droidShield.collectEvidence(
+    EvidenceContext(
+        installationId = appInstallId,
+        sessionId = session.id,
+        nonce = serverIssuedNonce,
+    )
 )
 ```
 
-**Send `checksRun` too — it matters more than it looks.** Because polymorphic builds can run a *subset* of checks, a report saying "0 threats out of 12 checks" is weaker evidence than "0 threats out of 41." And a report claiming 41 checks ran with 0 detections in 3 milliseconds is suspicious in itself.
+The SDK fills `sdkVersion`, app package/version, Android SDK, collection time,
+`checksRun`, and `triggeredChecks`. The host-supplied identifiers are opaque and
+optional. `schemaVersion` lets a backend evolve its parser without guessing which
+payload shape it received.
 
-**What not to send:** `detail` strings can contain file paths and process names. Keep them out of the default payload unless you've reviewed each one for PII and decided you need them for investigation.
+**Send `checksRun` too — it matters more than it looks.** A report with unexpectedly few completed checks may indicate errors, configuration differences, or a modified client. Treat that as one signal among many rather than proof of tampering.
+
+**What not to send:** access tokens belong in request headers, not the evidence object. `detail` strings are already omitted by the SDK contract.
 
 ---
 
@@ -205,9 +204,9 @@ Everything above still runs through a client the attacker controls. So why does 
 
 **Because the server enforces the verdict on its own side too.** The real protection isn't the app entering read-only mode — that's just UX. It's your server refusing to process the withdrawal when the session is flagged. The client-side response is a courtesy to honest users; the server-side refusal is the control. If a verdict only changes what the app draws on screen, you've built nothing.
 
-**Because lying leaves a trace.** Reports are a stream, not a snapshot. A device that reported 41 checks with 6 detections yesterday and 41 checks with 0 detections today, from the same install id, just told you something. So did the client that always reports perfectly clean but has impossible timing, or the thousand accounts reporting byte-identical evidence.
+**Because lying leaves a trace.** Reports are a stream, not a snapshot. A device that reported 40 checks with 6 detections yesterday and 40 checks with 0 detections today, from the same install id, just told you something. So did the client that always reports perfectly clean but has impossible timing, or the thousand accounts reporting byte-identical evidence.
 
-**Because polymorphic builds keep the bypass expensive.** An attacker who hooks around the checks in v2.1 faces a different check ordering and subset in v2.2 (see [README.md](README.md) §Polymorphic builds). Their patch needs redoing every release, while your policy change takes a config edit.
+**Because releases can vary check ordering.** A version-derived seed changes the execution sequence between releases. That can disrupt order-dependent instrumentation, but it does not stop an attacker from identifying or patching individual checks.
 
 **Because you can act at the account level, not the device level.** The device can refuse to send evidence. It cannot stop you from freezing the account, requiring re-verification, or reviewing the last 30 days of activity.
 

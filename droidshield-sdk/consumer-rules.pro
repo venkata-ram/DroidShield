@@ -13,3 +13,8 @@
 # class or its methods breaks the symbol lookup at load time, which takes
 # out all four native-layer checks silently.
 -keep class dev.droidshield.nativelayer.NativeBridge { *; }
+
+# These are wire DTOs intended for Retrofit converters. Preserve their names
+# and fields so reflection-based Gson/Moshi conversion emits the documented
+# backend contract in minified release builds.
+-keep class dev.droidshield.domain.backend.** { *; }

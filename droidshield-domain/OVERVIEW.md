@@ -13,6 +13,8 @@ below — you need `droidshield-data-android`'s `OVERVIEW.md` instead.
   it isn't just `android.content.Context`.
 - `ThreatCheck` — the interface every check implements.
 - `ThreatReporter` — security-signal callback.
+- `backend/*` — transport-neutral evidence and verdict DTOs for an app's own
+  Retrofit/Ktor/backend integration; no HTTP or JSON dependency is bundled.
 - `TelemetryEvent` / `TelemetrySink` — operational-signal callback, kept
   deliberately separate from `ThreatReporter` (DECISIONS.md D010).
 

@@ -8,8 +8,8 @@ import org.gradle.api.tasks.OutputDirectory
 import org.gradle.api.tasks.TaskAction
 
 /**
- * Writes a single generated Kotlin file exposing this build's polymorphic
- * seed as a compile-time constant. See DECISIONS.md D026 for why this
+ * Writes a single generated Kotlin file exposing the build's ordering seed
+ * as a compile-time constant. See DECISIONS.md D026 for why this
  * source-codegen approach was chosen over ASM bytecode instrumentation of
  * host-app classes.
  */

@@ -1046,3 +1046,73 @@ and a copy of `sample-app` pointed at mavenLocal (standing in for JitPack)
 built successfully with no `resolutionStrategy`. `compileDebugKotlin`
 passing proves the plugin resolved by ID and generated `DroidShieldBuildSeed`.
 Not yet verified against JitPack itself — that needs tag 0.2.0 pushed.
+
+## D034 — Backend decisions use a transport-neutral contract, not a bundled HTTP client
+
+**Date:** 2026-07-19
+**Status:** Decided
+
+**Decision:** The public API now includes `DeviceEvidence`, `TriggeredCheck`,
+`EvidenceContext`, `RiskVerdict`, and `RiskDecision`, plus
+`DroidShield.collectEvidence()`. The facade collects app/device metadata and check
+results into the request model, but it does not send the request. Integrators define
+their own Retrofit (or other HTTP client) interface, converter, authentication, and
+failure policy. Wire DTO names and fields are preserved by consumer R8 rules.
+
+**Reasoning:** A shared request/response shape makes backend-driven policy easy to
+integrate and version without coupling the SDK to a backend vendor. Depending on
+Retrofit or a particular JSON converter would impose that networking stack on every
+host app and conflict with D001. Plain Kotlin data classes work with reflection-based
+Retrofit/Gson, Moshi, Jackson, Ktor integrations, and manual clients without making
+any of them SDK dependencies. A schema version gives servers an explicit evolution
+point.
+
+The contract excludes `CheckResult.detail` because it can contain local paths and
+process names. Installation, session, and nonce values remain app-supplied and opaque;
+the SDK does not generate or persist tracking identifiers. Server-side enforcement is
+still mandatory: a returned verdict that only changes Android UI is not a security
+boundary.
+
+**Verified (2026-07-19):** `:droidshield-domain:test`,
+`:droidshield-sdk:testDebugUnitTest`, and `:droidshield-sdk:assembleRelease` all pass.
+
+## D035 — Position DroidShield as runtime threat detection, not a complete RASP product
+
+**Date:** 2026-07-19
+**Status:** Decided
+
+**Decision:** Public documentation describes DroidShield as an open-source Android
+runtime threat-detection SDK and a foundation for RASP architectures and
+backend-driven enforcement. It does not claim that DroidShield alone is a complete
+Runtime Application Self-Protection product.
+
+**Reasoning:** DroidShield detects runtime threats and produces evidence, but it does
+not bundle automatic prevention, a hosted policy backend, incident orchestration, or a
+management plane. Calling the current SDK a complete RASP product would imply controls
+that are deliberately outside its scope under D001 and D004. The narrower positioning
+is accurate without underselling the role DroidShield can play inside a larger RASP
+architecture.
+
+References to RASP remain appropriate when describing that broader architecture or
+contrasting DroidShield's detection layer with full commercial products. They must not
+imply that installing the SDK alone creates an end-to-end protection boundary.
+
+## D036 — Describe the Gradle feature as release-seeded ordering
+
+**Date:** 2026-07-19
+**Status:** Decided
+
+**Supersedes:** The "seed varies every build" wording in D026. D026 remains the
+record of why source generation was chosen instead of ASM instrumentation.
+
+**Decision:** Public documentation describes the implemented feature as reproducible,
+version-derived check ordering. It does not claim host-app bytecode injection,
+generated check implementations, a different check subset in each release, or a
+guaranteed need for attackers to rewrite bypasses.
+
+**Reasoning:** The Gradle plugin generates a seed from the consumer project path and
+version, and the SDK uses that seed to shuffle runtime execution order. The public SDK
+does not expose `CheckOrder`'s subset fraction, and the plugin does not rewrite host
+classes. Stable seeds also preserve incremental builds and reproducibility. Naming the
+actual mechanism makes its benefit and limitations clear without presenting ordering
+variation as a complete anti-bypass boundary.

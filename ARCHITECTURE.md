@@ -8,17 +8,22 @@ Status: V1 scope. See `DECISIONS.md` for the append-only decision log and
 **Goals**
 - Detect common runtime threats (root, debugger, hooking frameworks, emulator,
   tamper/repackaging) on Android.
-- Make adding a new check trivial for an external contributor who has never
-  seen the injection engine or the Gradle plugin internals.
-- Ship as open source: no backend, no telemetry, no vendor lock-in. The host
-  app decides where threat signals go.
+- Provide the detection and evidence layer that a host app can use within a broader
+  RASP architecture or backend-driven enforcement system.
+- Make adding a new check straightforward for an external contributor who has
+  not read the ordering engine or Gradle plugin internals.
+- Ship as open source: no hosted backend, bundled analytics vendor, or vendor
+  lock-in. The host app decides where threat signals and optional telemetry go.
 - Native (`.so`) layer for checks that are meaningfully harder to bypass in
   native code than in Java/Kotlin.
-- Polymorphic injection: each build assembles a different subset/ordering/
-  implementation-variant of checks, so a bypass written against one build
-  doesn't trivially transfer to the next.
+- Release-seeded ordering: the Gradle plugin generates a reproducible seed that
+  the runtime engine can use to vary check execution order between versions.
+  This is source generation, not host-app bytecode injection.
 
 **Explicit non-goals for V1**
+- Claiming to be a complete RASP product. Automatic prevention, enforcement,
+  incident orchestration, and a management plane remain the host application's or
+  backend's responsibility.
 - SSL pinning / network hardening (`NetworkGuard`) — deferred, see
   `DECISIONS.md`.
 - Any backend, dashboard, or hosted reporting service.
@@ -31,13 +36,13 @@ Status: V1 scope. See `DECISIONS.md` for the append-only decision log and
 ## 2. Layering — Clean Architecture applied to an SDK
 
 DroidShield is a library, not an app, so "Clean Architecture" here means:
-dependencies point inward, the innermost layer has zero Android/Gradle/ASM
+dependencies point inward, the innermost layer has zero Android/Gradle
 imports, and outer layers are swappable without touching detection logic.
 
 ```
 ┌─────────────────────────────────────────────────────────┐
-│  build-plugin        (Gradle, AGP Instrumentation API,   │
-│                        ASM bytecode visitors)             │
+│  build-plugin        (Gradle/Kotlin source generation of  │
+│                        a reproducible release seed)       │
 ├─────────────────────────────────────────────────────────┤
 │  data                (native bridge / JNI, Android APIs:  │
 │                        PackageManager, Build, /proc, etc) │
@@ -59,7 +64,7 @@ detection logic itself.
 
 This inversion is what lets a contributor add a check by touching only
 `data` (or `domain` + `data` for something genuinely new) without reading
-the Gradle plugin or the polymorphic engine at all.
+the Gradle plugin or ordering engine at all.
 
 ## 3. Module structure (Gradle modules)
 
@@ -68,8 +73,8 @@ droidshield/
 ├── droidshield-domain/          # pure Kotlin, no Android deps
 ├── droidshield-data-android/    # ThreatCheck implementations (Java/Kotlin side)
 ├── droidshield-native/          # C++ checks + JNI bridge, builds libdroidshield.so
-├── droidshield-engine/          # polymorphic injection engine, check registry
-├── droidshield-gradle-plugin/   # AGP Instrumentation API + ASM visitors
+├── droidshield-engine/          # check runner and seeded ordering
+├── droidshield-gradle-plugin/   # build-seed source generation
 ├── droidshield-sdk/             # public runtime .aar — DroidShield facade, DI graph
 └── sample-app/                  # demo app — standalone build, consumes JitPack artifacts
 ```
@@ -101,16 +106,15 @@ separate from `data-android` because it has its own build toolchain (CMake/
 NDK) and its own contribution bar (C++ + security background).
 
 ### droidshield-engine
-The `ThreatCheckRegistry` (check discovery/self-registration) and the
-polymorphic injection engine (seeded shuffling across check variants per
-build). This module does **not** know about specific checks — it operates
-on the `ThreatCheck` contract only. This is intentionally the smallest,
-most stable module: it should rarely need to change when checks are added.
+The check runner and seeded ordering implementation. This module does **not**
+know about specific checks — it operates on the `ThreatCheck` contract only.
+This is intentionally the smallest, most stable module: it should rarely need
+to change when checks are added.
 
 ### droidshield-gradle-plugin
-AGP Instrumentation API + `AsmClassVisitorFactory` wiring that calls into
-`droidshield-engine` at build time to decide what gets injected into the
-host app's bytecode, and where.
+Generates a Kotlin source file containing a reproducible seed derived from the
+consumer project and version. The host app passes that seed to `DroidShieldConfig`
+to enable runtime ordering variation. It does not rewrite host-app bytecode.
 
 ### droidshield-sdk
 The public `.aar`. Contains the `DroidShield` facade (the only class most
@@ -336,7 +340,7 @@ principle in `DECISIONS.md`.
 
 See `DECISIONS.md` for the full V1 exit criteria. Architecturally: all five
 `ThreatCategory` values have real, working checks wired through the Dagger
-multibinding graph, the polymorphic engine can shuffle across at least the
-Java/Kotlin-layer variants, the native `.so` covers root+debugger+hook at
+multibinding graph, the engine can apply reproducible seeded ordering, the
+native `.so` covers root+debugger+hook at
 minimum, and a fresh contributor can add one new check by touching only
 `droidshield-data-android` and reading nothing else.
