@@ -1,6 +1,6 @@
 # DroidShield
 
-Runtime application self-protection (RASP) for Android, as a plain `.aar` you drop into your app.
+Runtime application self-protection (RASP) for Android — one Gradle dependency, no backend, no SDK account.
 
 DroidShield answers one question at runtime: **is this app running in an environment I should trust?** It runs 40 checks across five threat categories — root, debugger, hooking frameworks, emulator, and tamper/repackaging — and hands you the results. What you do with them is entirely your call.
 
@@ -12,9 +12,26 @@ Commercial RASP vendors solve this with a backend you must send device data to, 
 
 ## Quick start
 
+DroidShield is distributed through **JitPack**, which builds it straight from a Git tag. Add the repository:
+
+```kotlin
+// settings.gradle.kts
+dependencyResolutionManagement {
+    repositories {
+        google()
+        mavenCentral()
+        maven("https://jitpack.io")
+    }
+}
+```
+
+Then depend on the SDK — `droidshield-sdk` pulls in the domain, check, native and engine modules transitively, so this is the only coordinate you declare:
+
 ```kotlin
 // app/build.gradle.kts
-implementation("com.github.venkata-ram.DroidShield:droidshield-sdk:0.1.0")
+dependencies {
+    implementation("com.github.venkata-ram.DroidShield:droidshield-sdk:0.1.0")
+}
 ```
 
 ```kotlin
@@ -34,14 +51,16 @@ data class CheckResult(
 )
 ```
 
-The JitPack repository and Gradle plugin setup take a few more lines — see **[INTEGRATION.md](INTEGRATION.md)**.
+That's the whole runtime setup. Polymorphic builds additionally need the `dev.droidshield` Gradle plugin, which takes a `resolutionStrategy` block to work around JitPack's group-ID rewriting — see **[INTEGRATION.md](INTEGRATION.md)**.
+
+> Group IDs are `com.github.venkata-ram.DroidShield`, not `dev.droidshield`. The artifacts are *built* with the `dev.droidshield` group, but JitPack rewrites it on publish. The `dev.droidshield` coordinates only apply to local builds (`./gradlew publishAllToMavenLocal`).
 
 ## What's different about it
 
 - **Polymorphic builds.** A Gradle plugin generates a per-build seed at compile time; the engine uses it to shuffle check ordering. A Frida script tuned against your v2.1 build doesn't cleanly transfer to v2.2. Bypasses stop being write-once.
 - **Native checks where they matter.** Anti-debug (`ptrace` self-attach), `/proc/self/maps` scanning, trampoline-hook detection, and native checksumming live in C++, not Kotlin — harder to patch out than a bytecode-level `if`.
 - **No backend. Ever.** No dashboard, no hosted service, no phone-home. `ThreatReporter` is a one-method interface you implement; your threat signals go where *you* send them.
-- **Zero third-party dependencies in the core.** The `.aar` never pulls in an analytics SDK, so it can't bloat your app or leak your users' data.
+- **Zero third-party dependencies in the core.** The published artifact never pulls in an analytics SDK, so it can't bloat your app or leak your users' data.
 - **Contributing a check is a one-file job.** One class plus one `@Provides @IntoSet` line — no need to read the Gradle plugin, the ASM layer, or the engine.
 
 DroidShield is headless: it never shows a dialog or kills your process. It reports, you decide.
