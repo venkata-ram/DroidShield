@@ -60,7 +60,7 @@ plugins {
 }
 ```
 
-See **[INTEGRATION.md](INTEGRATION.md)** for what the plugin does and the other six integration scenarios.
+See **[INTEGRATION.md](INTEGRATION.md)** for what the plugin does and the other integration scenarios.
 
 ## What's different about it
 
@@ -82,7 +82,8 @@ cd sample-app && ../gradlew assembleDebug
 
 ## Documentation
 
-- [INTEGRATION.md](INTEGRATION.md) — setup, configuration, and seven usage scenarios
+- [CONTRIBUTING.md](CONTRIBUTING.md) — development setup, check design rules, tests, and pull-request expectations
+- [INTEGRATION.md](INTEGRATION.md) — setup, configuration, and eight usage scenarios
 - [SERVER_DRIVEN_DECISIONS.md](SERVER_DRIVEN_DECISIONS.md) — letting your backend, not the APK, decide how to respond to threats
 - [ARCHITECTURE.md](ARCHITECTURE.md) — module layering and the extensibility contract
 - [DECISIONS.md](DECISIONS.md) — append-only rationale log
