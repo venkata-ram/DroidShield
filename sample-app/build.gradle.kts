@@ -13,6 +13,11 @@ plugins {
 
 val droidShieldVersion = "0.3.1"
 
+// DroidShield derives its release-specific ordering seed from Gradle's
+// Project.version. Android's versionName is a separate value, so keep both
+// backed by the same release version.
+version = droidShieldVersion
+
 android {
     namespace = "dev.droidshield.sample"
     compileSdk = 35

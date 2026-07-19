@@ -23,13 +23,10 @@ import kotlin.random.Random
  */
 class DroidShieldPlugin : Plugin<Project> {
     override fun apply(target: Project) {
-        val seed = resolveSeed(target)
-
         val generateSeedTask = target.tasks.register(
             "generateDroidShieldSeed",
             GenerateDroidShieldSeedTask::class.java,
         ) { task ->
-            task.seed.set(seed)
             task.outputDir.set(target.layout.buildDirectory.dir("generated/droidshield/kotlin"))
         }
 
@@ -49,6 +46,14 @@ class DroidShieldPlugin : Plugin<Project> {
         // early-returned on a perfectly valid build. afterEvaluate runs once
         // the consumer's whole plugins {} block has been processed.
         target.afterEvaluate {
+            // Build scripts normally assign `version` after their plugins {}
+            // block. Resolving the seed in apply() therefore observed
+            // Project.DEFAULT_VERSION ("unspecified") instead of the release
+            // version. Resolve it only after the complete script has run.
+            generateSeedTask.configure { task ->
+                task.seed.set(resolveSeed(it))
+            }
+
             if (it.extensions.findByType(AndroidComponentsExtension::class.java) == null) {
                 it.logger.warn(
                     "DroidShield Gradle plugin applied to '${it.path}', but no Android Gradle Plugin " +
